@@ -8,7 +8,7 @@ from starlette.requests import Request
 from starlette.responses import JSONResponse
 
 from app.api.deps import get_redis
-from app.api.routes import auth, chat
+from app.api.routes import admin, auth, chat
 from app.core.body_limit import add_body_size_limit_middleware
 from app.core.config import get_settings
 from app.core.middleware import SECURITY_HEADERS, add_security_headers_middleware
@@ -58,6 +58,7 @@ app.add_middleware(
 
 app.include_router(auth.router)
 app.include_router(chat.router)
+app.include_router(admin.router)
 
 logger = logging.getLogger(__name__)
 
