@@ -11,16 +11,22 @@
  * Loaded as a plain global script (no ES modules), after api.js, so it
  * reads `window.Api`.
  *
- * Scope for this task: login screen wired to real POST /auth/login,
- * token stored in sessionStorage, app shell with tab bar (Chat active
- * by default), sign out. Chat/System tab bodies are stub placeholders
- * only, Tasks 4 and 5 fill those in.
+ * Scope: login screen wired to real POST /auth/login, token stored in
+ * sessionStorage, app shell with tab bar (Chat active by default),
+ * sign out. Chat tab is wired to real POST /chat (message list,
+ * loading state, 429/403/generic error handling). System tab body is
+ * still a stub placeholder, Task 5 fills it in.
  */
 (function () {
   "use strict";
 
   var SESSION_TOKEN_KEY = "inferai_token";
   var SESSION_USERNAME_KEY = "inferai_username";
+
+  var GREETING_MESSAGE = {
+    role: "assistant",
+    text: "Hi, I'm ready to answer questions. Ask me anything.",
+  };
 
   var state = {
     view: "login", // "login" | "app"
@@ -29,6 +35,10 @@
     token: null,
     loginError: null,
     loginPending: false,
+    chatMessages: [GREETING_MESSAGE],
+    chatInput: "",
+    chatSending: false,
+    chatWarning: null, // inline warning banner text (e.g. 429 rate limit)
   };
 
   function setState(patch) {
@@ -216,13 +226,158 @@
 
   function renderTabBody() {
     if (state.tab === "chat") {
-      return h("div", { class: "tab-body-stub", id: "chat-tab-root" }, [
-        h("p", { text: "Chat tab (coming in a later task)." }),
-      ]);
+      return renderChatTab();
     }
     return h("div", { class: "tab-body-stub", id: "system-tab-root" }, [
       h("p", { text: "System tab (coming in a later task)." }),
     ]);
+  }
+
+  // ---- Chat tab ----------------------------------------------------------
+
+  function renderChatMessage(m) {
+    if (m.role === "user") {
+      return h("div", { class: "chat-row chat-row-user" }, [
+        h("div", { class: "chat-bubble chat-bubble-user", text: m.text }),
+      ]);
+    }
+
+    var bubbleClass = "chat-bubble chat-bubble-assistant";
+    if (m.variant === "error") {
+      bubbleClass += " chat-bubble-error";
+    } else if (m.variant === "system") {
+      bubbleClass += " chat-bubble-system";
+    }
+
+    var children = [h("div", { class: bubbleClass, text: m.text })];
+
+    if (m.hasMeta) {
+      children.push(
+        h("div", { class: "chat-meta-row" }, [
+          h("span", { class: "mono chat-meta-item", text: m.latencyMs + "ms" }),
+          h("span", { class: "mono chat-meta-item", text: m.tokens + " tok" }),
+        ])
+      );
+    }
+
+    return h("div", { class: "chat-row chat-row-assistant" }, [
+      h("div", { class: "chat-bubble-col" }, children),
+    ]);
+  }
+
+  function renderChatTab() {
+    var messageNodes = state.chatMessages.map(renderChatMessage);
+
+    if (state.chatSending) {
+      messageNodes.push(
+        h("div", { class: "chat-row chat-row-assistant" }, [
+          h("div", { class: "chat-bubble chat-bubble-assistant chat-bubble-thinking", text: "Thinking…" }),
+        ])
+      );
+    }
+
+    var warningNode = null;
+    if (state.chatWarning) {
+      warningNode = h("div", { class: "chat-warning-banner", text: state.chatWarning });
+    }
+
+    var chatInput = h("input", {
+      class: "text-input",
+      type: "text",
+      id: "chat-input",
+      placeholder: "Ask a question…",
+      value: state.chatInput,
+      disabled: state.chatSending,
+      onInput: function (e) {
+        state.chatInput = e.target.value;
+      },
+    });
+    chatInput.value = state.chatInput;
+
+    var sendButton = h("button", {
+      class: "btn-primary chat-send-btn",
+      type: "submit",
+      disabled: state.chatSending,
+      text: state.chatSending ? "Sending…" : "Send",
+    });
+
+    var form = h(
+      "form",
+      {
+        class: "chat-input-row",
+        onSubmit: function (e) {
+          e.preventDefault();
+          handleSendMessage(chatInput.value);
+        },
+      },
+      [
+        h("div", { class: "chat-input-row-inner" }, [warningNode, h("div", { class: "chat-input-fields" }, [chatInput, sendButton])]),
+      ]
+    );
+
+    return h("div", { class: "chat-tab-root", id: "chat-tab-root" }, [
+      h("div", { class: "chat-scroll" }, [h("div", { class: "chat-scroll-inner" }, messageNodes)]),
+      form,
+    ]);
+  }
+
+  async function handleSendMessage(rawText) {
+    var text = rawText.trim();
+    if (!text || state.chatSending) return;
+
+    var token = state.token;
+    var newMessages = state.chatMessages.concat([{ role: "user", text: text }]);
+    setState({ chatMessages: newMessages, chatInput: "", chatSending: true, chatWarning: null });
+
+    try {
+      var result = await window.Api.chat(text, token);
+      var totalTokens = (result.prompt_tokens || 0) + (result.completion_tokens || 0);
+      var assistantMsg = {
+        role: "assistant",
+        text: result.answer,
+        hasMeta: true,
+        latencyMs: Math.round(result.latency_ms),
+        tokens: totalTokens,
+      };
+      setState({
+        chatMessages: state.chatMessages.concat([assistantMsg]),
+        chatSending: false,
+      });
+    } catch (err) {
+      if (err.status === 429) {
+        setState({
+          chatSending: false,
+          chatInput: text,
+          chatWarning: err.message || "Rate limit exceeded, please slow down",
+        });
+        return;
+      }
+
+      if (err.status === 403) {
+        setState({
+          chatMessages: state.chatMessages.concat([
+            {
+              role: "assistant",
+              variant: "system",
+              text: err.message || "This account cannot use the chat API.",
+            },
+          ]),
+          chatSending: false,
+        });
+        return;
+      }
+
+      setState({
+        chatMessages: state.chatMessages.concat([
+          {
+            role: "assistant",
+            variant: "error",
+            text: err.message || "Something went wrong while contacting the chat API.",
+          },
+        ]),
+        chatSending: false,
+      });
+    }
   }
 
   function renderAppShell() {
@@ -243,6 +398,10 @@
       token: null,
       loginError: null,
       loginPending: false,
+      chatMessages: [GREETING_MESSAGE],
+      chatInput: "",
+      chatSending: false,
+      chatWarning: null,
     });
   }
 

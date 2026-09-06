@@ -86,8 +86,27 @@
     });
   }
 
+  /**
+   * Asks a question of the chat endpoint.
+   *
+   * @param {string} question
+   * @param {string} token - bearer token for Authorization.
+   * @returns {Promise<{answer: string, latency_ms: number,
+   *   prompt_tokens: number, completion_tokens: number}>}
+   * @throws {Error} on 403 (readonly role), 429 (rate limited), or
+   *   any other non-2xx/network failure; `.message` carries the
+   *   server's `detail` text when present.
+   */
+  function chat(question, token) {
+    return request("POST", "/chat", {
+      body: { question: question },
+      token: token,
+    });
+  }
+
   window.Api = {
     request: request,
     login: login,
+    chat: chat,
   };
 })();
