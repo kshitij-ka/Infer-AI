@@ -38,7 +38,7 @@ class Settings(BaseSettings):
     redis_url: str
 
     groq_api_key: str
-    groq_model: str = "llama-3.1-8b-instant"
+    groq_model: str = "llama-3.3-70b-versatile"
     llm_timeout_seconds: int = 15
     llm_max_retries: int = 3
 
