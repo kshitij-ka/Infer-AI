@@ -9,7 +9,7 @@ from sqlalchemy.orm import Session
 from starlette.requests import Request
 from starlette.responses import JSONResponse
 
-from app.api.deps import get_redis
+from app.api.deps import get_redis, require_role
 from app.api.routes import admin, auth, chat
 from app.core.body_limit import add_body_size_limit_middleware
 from app.core.config import get_settings
@@ -17,6 +17,7 @@ from app.core.logging import add_request_id_middleware, configure_logging
 from app.core.login_rate_limit import add_login_ip_rate_limit_middleware
 from app.core.middleware import SECURITY_HEADERS, add_security_headers_middleware
 from app.db.session import get_db
+from app.models.user import Role, User
 from app.services.metrics import render_metrics
 
 # Field names treated as sensitive across every request body schema in this
@@ -187,6 +188,21 @@ def health(db: Session = Depends(get_db), redis_client=Depends(get_redis)) -> di
 
 
 @app.get("/metrics")
-def metrics() -> Response:
+def metrics(_admin: User = Depends(require_role(Role.admin))) -> Response:
+    """
+    Exposes Prometheus metrics in text exposition format.
+
+    Restricted to admin role callers, since the metrics output
+    includes token usage, request counts, latency, and cache hit
+    rate, none of which should be visible to an unauthenticated
+    caller or a non-admin user.
+
+    Args:
+        _admin: the authenticated admin user making the request; not
+            used beyond the role check.
+
+    Returns:
+        A Response with Prometheus formatted metrics text.
+    """
     body, content_type = render_metrics()
     return Response(content=body, media_type=content_type)
