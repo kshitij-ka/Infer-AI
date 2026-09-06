@@ -11,11 +11,25 @@ from starlette.middleware.base import BaseHTTPMiddleware, RequestResponseEndpoin
 from starlette.requests import Request
 from starlette.responses import Response
 
+# This app now also serves a static frontend (app/static/, mounted in
+# main.py) alongside its JSON API, so the CSP can no longer deny
+# everything: it allows only the specific sources that frontend
+# actually needs (self-hosted CSS/JS/images, same-origin fetch() calls
+# to the API, and the Google Fonts CDN that tokens.css imports) and
+# keeps every other directive at 'none'.
 SECURITY_HEADERS = {
     "X-Content-Type-Options": "nosniff",
     "X-Frame-Options": "DENY",
     "Referrer-Policy": "no-referrer",
-    "Content-Security-Policy": "default-src 'none'; frame-ancestors 'none'",
+    "Content-Security-Policy": (
+        "default-src 'none'; "
+        "script-src 'self'; "
+        "style-src 'self' https://fonts.googleapis.com; "
+        "font-src https://fonts.gstatic.com; "
+        "img-src 'self'; "
+        "connect-src 'self'; "
+        "frame-ancestors 'none'"
+    ),
 }
 
 
@@ -23,10 +37,11 @@ class SecurityHeadersMiddleware(BaseHTTPMiddleware):
     """
     Adds a fixed set of security response headers to every response.
 
-    This is a JSON API with no HTML rendering, so the Content
-    Security Policy denies everything by default rather than
-    allowing specific sources, since there is nothing on this server
-    that needs to load a script, style, or frame.
+    The Content Security Policy defaults to denying everything and
+    then allows only the specific sources the static frontend
+    (app/static/) actually needs: same-origin scripts, styles, images,
+    and fetch() calls, plus the Google Fonts CDN that tokens.css
+    imports. Every other directive stays at 'none'.
     """
 
     async def dispatch(self, request: Request, call_next: RequestResponseEndpoint) -> Response:
