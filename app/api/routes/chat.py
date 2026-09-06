@@ -19,7 +19,12 @@ from app.core.config import get_settings
 from app.models.chat_log import ChatLog
 from app.models.user import Role, User
 from app.schemas.chat import ChatRequest, ChatResponse
-from app.services.cache import get_cached_answer, is_rate_limited, set_cached_answer
+from app.services.cache import (
+    build_rate_limit_key,
+    get_cached_answer,
+    is_rate_limited,
+    set_cached_answer,
+)
 from app.services.llm_client import LLMClient, get_llm_client
 from app.services.metrics import record_chat_metrics
 
@@ -60,8 +65,9 @@ def chat(
         )
 
     settings = get_settings()
+    rate_limit_key = build_rate_limit_key("chat", user.username)
     if is_rate_limited(
-        redis_client, key=user.username, limit_per_minute=settings.rate_limit_per_minute
+        redis_client, key=rate_limit_key, limit_per_minute=settings.rate_limit_per_minute
     ):
         raise HTTPException(
             status_code=status.HTTP_429_TOO_MANY_REQUESTS,

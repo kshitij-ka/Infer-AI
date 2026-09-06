@@ -16,6 +16,42 @@ def get_redis_client() -> redis.Redis:
     return _redis_client
 
 
+def build_rate_limit_key(namespace: str, *components: str) -> str:
+    """
+    Builds a rate limit key from a namespace and one or more untrusted
+    string components, hashing each component separately before
+    joining them so the key can never collide with a key built under
+    a different namespace or with a different set of components,
+    regardless of what characters those components contain.
+
+    Every rate limit key in this codebase must be built through this
+    function rather than each call site inventing its own raw key
+    string. Concatenating untrusted, unconstrained strings (such as a
+    username) directly into a key, even with a distinct prefix per
+    call site, is not sufficient: a username can be crafted to contain
+    any other call site's prefix or separator, aliasing two logically
+    unrelated rate limit buckets onto the same Redis key within the
+    same time window. Hashing each component to a fixed length digest
+    before joining removes this, since a digest can never be mistaken
+    for a boundary or prefix belonging to another namespace.
+
+    Args:
+        namespace: a short fixed string identifying the feature this
+            key belongs to (for example "chat", "login", "loginip"),
+            used verbatim, not hashed, so different namespaces are
+            still easy to tell apart in Redis.
+        *components: one or more untrusted, unconstrained string
+            values to bind the key to (a username, a client IP, or
+            both). Each is hashed independently.
+
+    Returns:
+        A deterministic rate limit key string unique to this
+        namespace and this exact sequence of components.
+    """
+    digests = [hashlib.sha256(component.encode("utf-8")).hexdigest() for component in components]
+    return ":".join([namespace, *digests])
+
+
 def is_rate_limited(client: redis.Redis, key: str, limit_per_minute: int) -> bool:
     """Fixed-window rate limiter keyed per user/IP, backed by Redis INCR + TTL."""
     window = int(time.time() // 60)

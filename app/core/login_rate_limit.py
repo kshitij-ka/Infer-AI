@@ -26,7 +26,7 @@ remains the more precise layer for well formed requests.
 
 from fastapi import FastAPI
 
-from app.services.cache import get_redis_client, is_rate_limited
+from app.services.cache import build_rate_limit_key, get_redis_client, is_rate_limited
 
 LOGIN_PATH = "/auth/login"
 TOO_MANY_REQUESTS_MESSAGE = b'{"detail":"Too many login attempts, please try again later"}'
@@ -35,10 +35,12 @@ TOO_MANY_REQUESTS_MESSAGE = b'{"detail":"Too many login attempts, please try aga
 def _build_ip_only_login_rate_limit_key(client_ip: str) -> str:
     """
     Builds a rate limit key for a client IP alone, for the login
-    endpoint. Uses a loginip: prefix, distinct from the login:
-    prefix the route level per-username-and-IP check uses and from
-    any other existing key namespace, so the two layers never read
-    or write the same Redis counter.
+    endpoint. Uses the shared build_rate_limit_key helper under the
+    "loginip" namespace, distinct from the "login" namespace the route
+    level per-username-and-IP check uses and from any other existing
+    namespace, so the two layers never read or write the same Redis
+    counter, and hashed so no crafted client IP or future component
+    can alias onto a key built under a different namespace.
 
     Args:
         client_ip: the client IP address read from the ASGI scope.
@@ -46,7 +48,7 @@ def _build_ip_only_login_rate_limit_key(client_ip: str) -> str:
     Returns:
         A deterministic rate limit key string for this client IP.
     """
-    return f"loginip:{client_ip}"
+    return build_rate_limit_key("loginip", client_ip)
 
 
 def _extract_client_ip(scope) -> str:

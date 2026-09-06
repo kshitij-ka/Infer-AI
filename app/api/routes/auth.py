@@ -9,8 +9,6 @@ usernames from a single IP either, since the chat endpoint's rate
 limiter and this one are independent per key.
 """
 
-import hashlib
-
 from fastapi import APIRouter, Depends, HTTPException, Request, status
 from sqlalchemy.orm import Session
 
@@ -19,21 +17,18 @@ from app.core.config import get_settings
 from app.core.security import create_access_token, verify_password
 from app.models.user import User
 from app.schemas.auth import LoginRequest, LoginResponse
-from app.services.cache import is_rate_limited
+from app.services.cache import build_rate_limit_key, is_rate_limited
 
 router = APIRouter(prefix="/auth", tags=["auth"])
 
 
 def _build_login_rate_limit_key(username: str, client_ip: str) -> str:
     """
-    Builds a rate limit key for a username and client IP pair that
-    cannot collide across different pairs. Username is an unconstrained
-    string, so concatenating it with the IP using a plain separator
-    would let a crafted username containing that separator alias onto
-    another user's key. Hashing each component separately with a fixed
-    length digest before joining them removes that ambiguity, since
-    the digest of one component can never be mistaken for a boundary
-    inside the other.
+    Builds a rate limit key for a username and client IP pair, using
+    the shared build_rate_limit_key helper under the "login" namespace
+    so this key can never collide with a key built under any other
+    namespace ("chat", "loginip", or any future one), no matter what
+    characters the username or IP contain.
 
     Args:
         username: the submitted login username, untrusted and
@@ -44,9 +39,7 @@ def _build_login_rate_limit_key(username: str, client_ip: str) -> str:
         A deterministic rate limit key string unique to this
         username and client IP combination.
     """
-    username_digest = hashlib.sha256(username.encode("utf-8")).hexdigest()
-    ip_digest = hashlib.sha256(client_ip.encode("utf-8")).hexdigest()
-    return f"login:{username_digest}:{ip_digest}"
+    return build_rate_limit_key("login", username, client_ip)
 
 
 @router.post("/login", response_model=LoginResponse)

@@ -43,6 +43,60 @@ def test_single_malformed_login_request_still_gets_422(client):
     assert response.status_code == 422
 
 
+def test_crafted_username_cannot_collide_with_loginip_namespace(client, seed_user):
+    """
+    A username crafted to look exactly like a loginip: rate limit key
+    (for example "loginip:testclient", matching the literal client IP
+    string Starlette's TestClient reports for every request) must not
+    let that user's chat activity consume or interfere with the
+    login-IP rate limit bucket for that IP.
+
+    Before build_rate_limit_key existed, the chat route's rate limit
+    key was the raw, unhashed username with no namespace prefix at
+    all, so a user named exactly "loginip:testclient" made every chat
+    rate limit increment land on the identical Redis key
+    (ratelimit:loginip:testclient:<window>) that
+    LoginIPRateLimitMiddleware uses for the per-IP login check for
+    that same client, since that middleware's key before hashing was
+    also the literal string "loginip:testclient". A crafted-username
+    account could then fill up that shared counter with ordinary
+    authenticated chat calls and lock out every login attempt from
+    that client, including a different, legitimate user's very first
+    ever login attempt, purely as a side effect. Hashing every
+    component of every rate limit key through build_rate_limit_key
+    closes this: the chat key is now namespace "chat" plus a hash of
+    the username, and the login-IP key is namespace "loginip" plus a
+    hash of the client IP, so they can never land on the same Redis
+    key regardless of what the username contains.
+    """
+    settings = get_settings()
+
+    crafted_username = "loginip:testclient"
+    seed_user(username=crafted_username, password="password123")
+
+    login_response = client.post(
+        "/auth/login", json={"username": crafted_username, "password": "password123"}
+    )
+    assert login_response.status_code == 200
+    token = login_response.json()["access_token"]
+
+    chat_limit = settings.rate_limit_per_minute
+    for _ in range(chat_limit + 2):
+        client.post(
+            "/chat",
+            json={"question": "does this collide"},
+            headers={"Authorization": f"Bearer {token}"},
+        )
+
+    seed_user(username="innocent_bystander", password="password123")
+    innocent_login_response = client.post(
+        "/auth/login",
+        json={"username": "innocent_bystander", "password": "password123"},
+    )
+
+    assert innocent_login_response.status_code == 200
+
+
 def test_well_formed_logins_under_account_limit_are_unaffected(client, seed_user):
     """
     Well formed login requests, sent fewer times than both the
