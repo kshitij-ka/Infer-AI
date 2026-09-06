@@ -20,6 +20,25 @@ logging.basicConfig(level=settings.log_level)
 
 app = FastAPI(title=settings.app_name)
 
+# Starlette runs middleware in the reverse of the order it is added here:
+# the last middleware added is the outermost layer and therefore the first
+# to see an incoming request and the last to see the outgoing response.
+# With the registration order below (body size limit, then security
+# headers, then CORS), the actual per-request execution order is:
+#   1. CORSMiddleware (outermost, added last): handles preflight
+#      OPTIONS requests and stamps CORS response headers.
+#   2. SecurityHeadersMiddleware: stamps the fixed security headers
+#      onto whatever response the inner layers produce.
+#   3. BodySizeLimitMiddleware (innermost, added first): counts
+#      request body bytes and rejects oversized bodies before they
+#      reach routing or request body parsing.
+# On the way out, responses pass back through this stack in the
+# opposite order (body size limit's own early responses first, then
+# security headers, then CORS). Reordering these add_middleware calls
+# changes which layer sees a request or response first, so do not
+# reorder them without re-checking this comment and the tests in
+# tests/test_body_limit.py, tests/test_security_headers.py, and
+# tests/test_cors.py.
 add_body_size_limit_middleware(app, max_bytes=settings.max_request_body_bytes)
 
 add_security_headers_middleware(app)
