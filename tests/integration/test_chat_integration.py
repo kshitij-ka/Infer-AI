@@ -2,7 +2,9 @@ from app.core.security import hash_password
 from app.models.user import Role, User
 
 
-def test_chat_round_trip_against_real_containers(integration_client, integration_db, integration_fake_llm):
+def test_chat_round_trip_against_real_containers(
+    integration_client, integration_db, integration_fake_llm
+):
     """
     A full login and chat round trip against real Postgres (for the
     user and chat log rows) and real Redis (for rate limiting and
@@ -10,7 +12,9 @@ def test_chat_round_trip_against_real_containers(integration_client, integration
     TTL semantics work end to end, which sqlite and fakeredis cannot
     fully guarantee.
     """
-    user = User(username="integrationuser", hashed_password=hash_password("password123"), role=Role.user)
+    user = User(
+        username="integrationuser", hashed_password=hash_password("password123"), role=Role.user
+    )
     integration_db.add(user)
     integration_db.commit()
 

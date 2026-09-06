@@ -40,7 +40,9 @@ def fake_llm():
     from unittest.mock import MagicMock
 
     mock_client = MagicMock()
-    mock_client.ask.return_value = LLMResult(answer="mocked answer", prompt_tokens=5, completion_tokens=10)
+    mock_client.ask.return_value = LLMResult(
+        answer="mocked answer", prompt_tokens=5, completion_tokens=10
+    )
     return mock_client
 
 

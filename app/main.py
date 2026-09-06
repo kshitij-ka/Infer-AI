@@ -9,14 +9,6 @@ from sqlalchemy.orm import Session
 from starlette.requests import Request
 from starlette.responses import JSONResponse
 
-# Field names treated as sensitive across every request body schema in this
-# application. The raw "input" value FastAPI's default validation error
-# handler echoes back must never include the submitted value for any of
-# these fields. Currently "password" is the only such field (used by
-# LoginRequest and CreateUserRequest); if a new schema adds another
-# sensitive field (an API key, a token, etc), add its name here.
-SENSITIVE_FIELD_NAMES = {"password"}
-
 from app.api.deps import get_redis
 from app.api.routes import admin, auth, chat
 from app.core.body_limit import add_body_size_limit_middleware
@@ -25,6 +17,14 @@ from app.core.logging import add_request_id_middleware, configure_logging
 from app.core.middleware import SECURITY_HEADERS, add_security_headers_middleware
 from app.db.session import get_db
 from app.services.metrics import render_metrics
+
+# Field names treated as sensitive across every request body schema in this
+# application. The raw "input" value FastAPI's default validation error
+# handler echoes back must never include the submitted value for any of
+# these fields. Currently "password" is the only such field (used by
+# LoginRequest and CreateUserRequest); if a new schema adds another
+# sensitive field (an API key, a token, etc), add its name here.
+SENSITIVE_FIELD_NAMES = {"password"}
 
 settings = get_settings()
 configure_logging(settings.log_level)
@@ -62,9 +62,7 @@ add_body_size_limit_middleware(app, max_bytes=settings.max_request_body_bytes)
 add_security_headers_middleware(app)
 
 allowed_origins = [
-    origin.strip()
-    for origin in settings.cors_allowed_origins.split(",")
-    if origin.strip()
+    origin.strip() for origin in settings.cors_allowed_origins.split(",") if origin.strip()
 ]
 app.add_middleware(
     CORSMiddleware,
@@ -141,9 +139,8 @@ async def handle_request_validation_error(
         loc = error.get("loc", ())
         field_name = loc[-1] if loc else None
         sanitized_error = {k: v for k, v in error.items() if k != "input"}
-        if field_name not in SENSITIVE_FIELD_NAMES:
-            if "input" in error:
-                sanitized_error["input"] = error["input"]
+        if field_name not in SENSITIVE_FIELD_NAMES and "input" in error:
+            sanitized_error["input"] = error["input"]
         sanitized_errors.append(sanitized_error)
 
     content = jsonable_encoder({"detail": sanitized_errors})

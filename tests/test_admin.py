@@ -102,7 +102,9 @@ def test_invalid_password_length_does_not_echo_password_in_response(client, seed
     assert len(password_errors) == 1
     password_error = password_errors[0]
     assert "input" not in password_error
-    assert "min_length" in str(password_error.get("ctx", "")) or "at least 8" in password_error.get("msg", "")
+    assert "min_length" in str(password_error.get("ctx", "")) or "at least 8" in (
+        password_error.get("msg", "")
+    )
     assert "password" in str(password_error["loc"])
 
 

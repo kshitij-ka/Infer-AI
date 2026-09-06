@@ -5,8 +5,9 @@ Holds middleware that applies to every request regardless of route,
 such as response security headers. Kept separate from main.py so
 main.py stays focused on wiring routers together.
 """
+
 from fastapi import FastAPI
-from starlette.middleware.base import BaseHTTPMiddleware
+from starlette.middleware.base import BaseHTTPMiddleware, RequestResponseEndpoint
 from starlette.requests import Request
 from starlette.responses import Response
 
@@ -28,7 +29,7 @@ class SecurityHeadersMiddleware(BaseHTTPMiddleware):
     that needs to load a script, style, or frame.
     """
 
-    async def dispatch(self, request: Request, call_next) -> Response:
+    async def dispatch(self, request: Request, call_next: RequestResponseEndpoint) -> Response:
         """
         Runs the next handler in the chain, then stamps the security
         headers onto whatever response it returns.

@@ -8,6 +8,7 @@ RequestIdMiddleware, which assigns a UUID per request, attaches it
 to the response as a header, and makes it available to log records
 emitted while handling that request through a context variable.
 """
+
 import json
 import logging
 import time
@@ -15,7 +16,7 @@ import uuid
 from contextvars import ContextVar
 
 from fastapi import FastAPI
-from starlette.middleware.base import BaseHTTPMiddleware
+from starlette.middleware.base import BaseHTTPMiddleware, RequestResponseEndpoint
 from starlette.requests import Request
 from starlette.responses import Response
 
@@ -74,7 +75,7 @@ class RequestIdMiddleware(BaseHTTPMiddleware):
     per request with the method, path, status code, and latency.
     """
 
-    async def dispatch(self, request: Request, call_next) -> Response:
+    async def dispatch(self, request: Request, call_next: RequestResponseEndpoint) -> Response:
         """
         Generates a request id, stores it in the context variable,
         times the request, logs a summary line, and attaches the id

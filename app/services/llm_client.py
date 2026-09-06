@@ -13,9 +13,7 @@ from app.core.config import get_settings
 
 logger = logging.getLogger(__name__)
 
-FALLBACK_ANSWER = (
-    "The AI service is temporarily unavailable. Please try again in a moment."
-)
+FALLBACK_ANSWER = "The AI service is temporarily unavailable. Please try again in a moment."
 
 _RETRYABLE_EXCEPTIONS = (APIConnectionError, APITimeoutError, APIStatusError)
 
@@ -63,7 +61,9 @@ class LLMClient:
                 exc.__class__.__name__,
                 getattr(exc, "status_code", None),
             )
-            return LLMResult(answer=FALLBACK_ANSWER, prompt_tokens=0, completion_tokens=0, is_fallback=True)
+            return LLMResult(
+                answer=FALLBACK_ANSWER, prompt_tokens=0, completion_tokens=0, is_fallback=True
+            )
 
     def _ask_with_retry(self, question: str) -> LLMResult:
         @retry(

@@ -1,7 +1,6 @@
 import logging
 
 import httpx
-import pytest
 from groq import APIStatusError
 
 from app.services.llm_client import LLMClient

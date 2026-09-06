@@ -8,6 +8,7 @@ IP without being blocked, and cannot bypass the limit by rotating
 usernames from a single IP either, since the chat endpoint's rate
 limiter and this one are independent per key.
 """
+
 import hashlib
 
 from fastapi import APIRouter, Depends, HTTPException, Request, status

@@ -16,7 +16,9 @@ CHAT_REQUESTS = Counter(
 )
 
 
-def record_chat_metrics(latency_ms: float, prompt_tokens: int, completion_tokens: int, status: str) -> None:
+def record_chat_metrics(
+    latency_ms: float, prompt_tokens: int, completion_tokens: int, status: str
+) -> None:
     REQUEST_LATENCY.observe(latency_ms)
     TOKEN_USAGE.labels(type="prompt").inc(prompt_tokens)
     TOKEN_USAGE.labels(type="completion").inc(completion_tokens)

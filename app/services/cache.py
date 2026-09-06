@@ -20,7 +20,10 @@ def is_rate_limited(client: redis.Redis, key: str, limit_per_minute: int) -> boo
     """Fixed-window rate limiter keyed per user/IP, backed by Redis INCR + TTL."""
     window = int(time.time() // 60)
     redis_key = f"ratelimit:{key}:{window}"
-    count = client.incr(redis_key)
+    # redis-py types INCR's return as Awaitable[Any] | Any because the
+    # same command mixin backs both the sync and async clients; this
+    # client is always the sync redis.Redis, so INCR always returns int.
+    count: int = client.incr(redis_key)  # type: ignore[assignment]
     if count == 1:
         client.expire(redis_key, 60)
     return count > limit_per_minute
@@ -69,7 +72,10 @@ def get_cached_answer(client: redis.Redis, question: str) -> str | None:
     Returns:
         The cached answer string if present, otherwise None.
     """
-    return client.get(_cache_key(question))
+    # redis-py types GET's return as Awaitable[Any] | Any for the same
+    # reason as INCR above; this client is decode_responses=True sync
+    # redis.Redis, so GET always returns str or None.
+    return client.get(_cache_key(question))  # type: ignore[return-value]
 
 
 def set_cached_answer(client: redis.Redis, question: str, answer: str, ttl_seconds: int) -> None:

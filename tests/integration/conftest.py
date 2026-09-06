@@ -8,8 +8,8 @@ be slow, flaky, and cost money, and proves nothing about database or
 Redis correctness). Run `docker compose up -d postgres redis` before
 running this test tier.
 """
+
 import os
-import uuid
 from unittest.mock import MagicMock
 
 import pytest
@@ -32,17 +32,16 @@ os.environ["DATABASE_URL"] = "postgresql+psycopg2://postgres:postgres@localhost:
 os.environ["REDIS_URL"] = "redis://localhost:6379/1"
 os.environ["GROQ_API_KEY"] = "integration-test-key"
 
-from app.api.deps import get_redis
-from app.db.base import Base
-from app.db.session import get_db
-from app.services.llm_client import LLMResult, get_llm_client
-
 # Importing app.main registers every model (User, ChatLog) on Base.metadata
 # via the route import chain, which must happen before integration_engine
 # calls Base.metadata.create_all below. Without this import, only whichever
 # model tests/conftest.py happens to import is registered, and create_all
 # silently creates an incomplete schema (missing the chat_logs table).
 import app.main  # noqa: F401
+from app.api.deps import get_redis
+from app.db.base import Base
+from app.db.session import get_db
+from app.services.llm_client import LLMResult, get_llm_client
 
 
 @pytest.fixture(scope="session")
@@ -93,7 +92,9 @@ def integration_redis():
 def integration_fake_llm():
     """A mocked LLM client, since integration tests should not make real LLM calls."""
     mock_client = MagicMock()
-    mock_client.ask.return_value = LLMResult(answer="integration test answer", prompt_tokens=3, completion_tokens=7)
+    mock_client.ask.return_value = LLMResult(
+        answer="integration test answer", prompt_tokens=3, completion_tokens=7
+    )
     return mock_client
 
 

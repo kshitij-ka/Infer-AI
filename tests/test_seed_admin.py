@@ -12,6 +12,7 @@ see it (because, in the test, the existence check is bypassed for this
 scenario). This exercises exactly the code path that matters: the
 IntegrityError handling around db.commit.
 """
+
 import os
 
 os.environ.setdefault("JWT_SECRET_KEY", "test-secret-with-minimum-length-required")
@@ -121,7 +122,13 @@ def test_seed_admin_handles_integrity_error_from_concurrent_race(
 
     db = TestSessionLocal()
     try:
-        db.add(User(username=username, hashed_password=hash_password("firstpass123"), role=Role.admin))
+        db.add(
+            User(
+                username=username,
+                hashed_password=hash_password("firstpass123"),
+                role=Role.admin,
+            )
+        )
         db.commit()
         original_password_hash = (
             db.query(User).filter(User.username == username).first().hashed_password
@@ -130,7 +137,11 @@ def test_seed_admin_handles_integrity_error_from_concurrent_race(
         db.close()
 
     class _NoneFoundQuery:
-        """A query stand-in whose filter/first chain always reports no existing user, modeling the race window where the existence check ran before the conflicting row existed."""
+        """
+        A query stand-in whose filter/first chain always reports no
+        existing user, modeling the race window where the existence
+        check ran before the conflicting row existed.
+        """
 
         def filter(self, *args, **kwargs):
             return self
@@ -139,7 +150,11 @@ def test_seed_admin_handles_integrity_error_from_concurrent_race(
             return None
 
     class _RaceSimulatingSession(TestSessionLocal.class_):
-        """A session whose query(User) always reports no match, so the only place a pre-existing duplicate can be caught is the commit time IntegrityError handling."""
+        """
+        A session whose query(User) always reports no match, so the
+        only place a pre-existing duplicate can be caught is the
+        commit time IntegrityError handling.
+        """
 
         def query(self, entity, *args, **kwargs):
             if entity is User:
@@ -149,7 +164,9 @@ def test_seed_admin_handles_integrity_error_from_concurrent_race(
     monkeypatch.setattr(
         seed_admin_module,
         "SessionLocal",
-        sessionmaker(autocommit=False, autoflush=False, bind=TEST_ENGINE, class_=_RaceSimulatingSession),
+        sessionmaker(
+            autocommit=False, autoflush=False, bind=TEST_ENGINE, class_=_RaceSimulatingSession
+        ),
     )
 
     monkeypatch.setenv("ADMIN_USERNAME", username)

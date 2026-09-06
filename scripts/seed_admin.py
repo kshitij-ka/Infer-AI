@@ -11,6 +11,7 @@ listings and shell history on a shared machine.
 Usage:
     ADMIN_USERNAME=admin ADMIN_PASSWORD=change-me python -m scripts.seed_admin
 """
+
 import os
 import sys
 

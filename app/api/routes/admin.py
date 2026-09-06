@@ -7,6 +7,7 @@ this route, or by the one time seed script (scripts/seed_admin.py)
 for the very first admin account, since an admin only endpoint has
 no way to create the first admin.
 """
+
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
@@ -50,12 +51,12 @@ def create_user(
     db.add(user)
     try:
         db.commit()
-    except IntegrityError:
+    except IntegrityError as err:
         db.rollback()
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
             detail="Username already exists",
-        )
+        ) from err
 
     db.refresh(user)
     return CreateUserResponse(id=user.id, username=user.username, role=user.role)

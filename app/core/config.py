@@ -6,6 +6,7 @@ pydantic-settings. No default values exist for secrets, so a missing
 required setting fails at import time instead of falling back to an
 insecure default.
 """
+
 from functools import lru_cache
 
 from pydantic import field_validator
@@ -65,8 +66,7 @@ class Settings(BaseSettings):
         """
         if len(value) < MIN_JWT_SECRET_LENGTH:
             raise ValueError(
-                f"jwt_secret_key must be at least {MIN_JWT_SECRET_LENGTH} "
-                "characters long"
+                f"jwt_secret_key must be at least {MIN_JWT_SECRET_LENGTH} " "characters long"
             )
         return value
 
@@ -116,8 +116,7 @@ class Settings(BaseSettings):
         """
         if value < MIN_MAX_REQUEST_BODY_BYTES:
             raise ValueError(
-                f"max_request_body_bytes must be at least "
-                f"{MIN_MAX_REQUEST_BODY_BYTES} bytes"
+                f"max_request_body_bytes must be at least " f"{MIN_MAX_REQUEST_BODY_BYTES} bytes"
             )
         return value
 

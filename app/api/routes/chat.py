@@ -8,6 +8,7 @@ result. Every request, whether served from cache or from the LLM,
 gets a ChatLog row and updates Prometheus metrics, so history and
 observability stay accurate regardless of cache status.
 """
+
 import time
 
 from fastapi import APIRouter, Depends, HTTPException, status
@@ -59,7 +60,9 @@ def chat(
         )
 
     settings = get_settings()
-    if is_rate_limited(redis_client, key=user.username, limit_per_minute=settings.rate_limit_per_minute):
+    if is_rate_limited(
+        redis_client, key=user.username, limit_per_minute=settings.rate_limit_per_minute
+    ):
         raise HTTPException(
             status_code=status.HTTP_429_TOO_MANY_REQUESTS,
             detail="Rate limit exceeded, please slow down",

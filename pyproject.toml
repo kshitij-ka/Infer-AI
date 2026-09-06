@@ -1,0 +1,31 @@
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B", "SIM"]
+ignore = []
+
+# B008 (function call in argument default) flags every FastAPI
+# Depends(...) usage, which is the documented, idiomatic way to declare
+# FastAPI dependencies (see https://fastapi.tiangolo.com/tutorial/dependencies/).
+# This is a well understood false positive for this specific framework
+# pattern, so it is disabled only in the files that use Depends(...) as a
+# parameter default, rather than for the whole codebase.
+[tool.ruff.lint.per-file-ignores]
+"app/api/deps.py" = ["B008"]
+"app/api/routes/admin.py" = ["B008"]
+"app/api/routes/auth.py" = ["B008"]
+"app/api/routes/chat.py" = ["B008"]
+"app/main.py" = ["B008"]
+
+[tool.ruff.format]
+quote-style = "double"
+
+[tool.mypy]
+python_version = "3.12"
+warn_return_any = true
+warn_unused_configs = true
+ignore_missing_imports = true
+disallow_untyped_defs = false
+plugins = ["pydantic.mypy"]

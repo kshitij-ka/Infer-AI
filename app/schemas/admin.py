@@ -1,6 +1,7 @@
 """
 Request and response models for admin only user management routes.
 """
+
 from pydantic import BaseModel, Field
 
 from app.models.user import Role

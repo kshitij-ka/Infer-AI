@@ -30,10 +30,11 @@ def test_configured_origin_is_allowed(monkeypatch):
 
     get_settings.cache_clear()
 
+    import importlib
+
     from fastapi.testclient import TestClient
 
     import app.main as main_module
-    import importlib
 
     importlib.reload(main_module)
 
