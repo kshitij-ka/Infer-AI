@@ -1,6 +1,7 @@
 """
 Groq LLM client with retry, timeout, and fallback handling.
 """
+
 import logging
 from dataclasses import dataclass
 
@@ -77,6 +78,7 @@ class LLMClient:
 
     def _ask_with_retry(self, question: str) -> LLMResult:
         """Calls the Groq API with exponential backoff retry on transient errors."""
+
         @retry(
             reraise=True,
             stop=stop_after_attempt(self._max_retries),

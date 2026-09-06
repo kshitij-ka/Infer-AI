@@ -1,6 +1,7 @@
 """
 User model and role enum.
 """
+
 import enum
 import uuid
 

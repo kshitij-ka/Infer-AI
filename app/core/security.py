@@ -1,6 +1,7 @@
 """
 JWT creation and verification, and password hashing.
 """
+
 from datetime import UTC, datetime, timedelta
 
 from jose import JWTError, jwt

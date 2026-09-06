@@ -2,6 +2,7 @@
 Prometheus metrics definitions and helpers for the chat route and
 the metrics endpoint.
 """
+
 from prometheus_client import CONTENT_TYPE_LATEST, Counter, Histogram, generate_latest
 
 REQUEST_LATENCY = Histogram(

@@ -111,7 +111,5 @@ def test_well_formed_logins_under_account_limit_are_unaffected(client, seed_user
     account_limit = settings.login_rate_limit_per_minute
 
     for _ in range(account_limit - 1):
-        response = client.post(
-            "/auth/login", json={"username": "alice", "password": "password123"}
-        )
+        response = client.post("/auth/login", json={"username": "alice", "password": "password123"})
         assert response.status_code == 200

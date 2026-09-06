@@ -1,6 +1,7 @@
 """
 Chat log model, recording every chat request and its outcome.
 """
+
 import uuid
 from datetime import UTC, datetime
 

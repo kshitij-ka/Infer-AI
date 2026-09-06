@@ -1,6 +1,7 @@
 """
 Request and response models for the login route.
 """
+
 from pydantic import BaseModel
 
 

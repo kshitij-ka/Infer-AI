@@ -1,6 +1,7 @@
 """
 Request and response models for the chat route.
 """
+
 from pydantic import BaseModel, Field
 
 
