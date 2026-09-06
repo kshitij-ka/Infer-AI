@@ -328,7 +328,7 @@
         <span class="endpoint-detail-path">/chat</span>
         <span class="badge-pill">Bearer token required</span>
       </div>
-      <p class="endpoint-detail-desc">Sends a question to the configured LLM and returns the generated answer. Retries once on timeout, then falls back to a secondary model.</p>
+      <p class="endpoint-detail-desc">Sends a question to the configured LLM and returns the generated answer. Retries transient LLM errors internally, and returns a fallback answer if retries are exhausted.</p>
       <div class="endpoint-detail-grid">
         <div>
           <div class="endpoint-field-label">Request body</div>
@@ -341,12 +341,12 @@
           <pre class="endpoint-code-block">{
   "answer": "string",
   "latency_ms": 612,
-  "tokens_used": 184,
-  "model": "gpt-4o-mini"
+  "prompt_tokens": 128,
+  "completion_tokens": 56
 }</pre>
         </div>
       </div>
-      <div class="endpoint-detail-errors">401: missing or invalid token.<br />429: rate limit exceeded.<br />502: LLM provider error after retry.</div>
+      <div class="endpoint-detail-errors">401: missing or invalid token.<br />403: read-only users cannot use the chat API.<br />429: rate limit exceeded.</div>
     </div>
 
     <div id="endpoint-health" class="card-outline">
@@ -377,10 +377,13 @@
       <p class="endpoint-detail-desc">Returns request latency, LLM token usage, and error rate in Prometheus exposition format.</p>
       <div>
         <div class="endpoint-field-label">Response 200 (text/plain)</div>
-        <pre class="endpoint-code-block">http_request_duration_seconds{route="/chat"} 0.61
-llm_tokens_used_total 184213
-chat_requests_total{status="200"} 8420
-chat_requests_total{status="502"} 12</pre>
+        <pre class="endpoint-code-block">chat_request_latency_ms_sum 5142.3
+chat_request_latency_ms_count 8420
+chat_token_usage_total{type="prompt"} 142088
+chat_token_usage_total{type="completion"} 42125
+chat_requests_total{status="ok"} 8190
+chat_requests_total{status="fallback"} 18
+chat_requests_total{status="cache_hit"} 212</pre>
       </div>
     </div>
 
