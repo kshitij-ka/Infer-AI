@@ -7,6 +7,7 @@ from sqlalchemy.orm import Session
 from app.api.deps import get_redis
 from app.api.routes import auth, chat
 from app.core.config import get_settings
+from app.core.middleware import add_security_headers_middleware
 from app.db.session import get_db
 from app.services.metrics import render_metrics
 
@@ -14,6 +15,8 @@ settings = get_settings()
 logging.basicConfig(level=settings.log_level)
 
 app = FastAPI(title=settings.app_name)
+
+add_security_headers_middleware(app)
 
 app.include_router(auth.router)
 app.include_router(chat.router)
