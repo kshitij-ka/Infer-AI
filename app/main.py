@@ -1,11 +1,21 @@
 import logging
 
 from fastapi import Depends, FastAPI, Response
+from fastapi.encoders import jsonable_encoder
+from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy import text
 from sqlalchemy.orm import Session
 from starlette.requests import Request
 from starlette.responses import JSONResponse
+
+# Field names treated as sensitive across every request body schema in this
+# application. The raw "input" value FastAPI's default validation error
+# handler echoes back must never include the submitted value for any of
+# these fields. Currently "password" is the only such field (used by
+# LoginRequest and CreateUserRequest); if a new schema adds another
+# sensitive field (an API key, a token, etc), add its name here.
+SENSITIVE_FIELD_NAMES = {"password"}
 
 from app.api.deps import get_redis
 from app.api.routes import admin, auth, chat
@@ -82,6 +92,54 @@ async def handle_unexpected_exception(request: Request, exc: Exception) -> JSONR
     """
     logger.exception("Unhandled exception on %s %s", request.method, request.url.path)
     response = JSONResponse(status_code=500, content={"detail": "Internal server error"})
+    for header_name, header_value in SECURITY_HEADERS.items():
+        response.headers[header_name] = header_value
+    return response
+
+
+@app.exception_handler(RequestValidationError)
+async def handle_request_validation_error(
+    request: Request, exc: RequestValidationError
+) -> JSONResponse:
+    """
+    Replaces FastAPI's default request validation error response with a
+    sanitized version.
+
+    FastAPI's default handler for RequestValidationError echoes the raw
+    "input" value for every field that failed validation. For a field
+    such as "password" that only has length constraints, this means a
+    password that is too short or too long gets echoed back verbatim in
+    the 422 response body, leaking the plaintext password into any
+    logging surface that captures response bodies (load balancer access
+    logs, client side error trackers, browser dev tools, shared
+    terminals).
+
+    This handler keeps the field location and the validation message for
+    every error (so the client still learns which field failed and why),
+    but drops the "input" key for any field listed in
+    SENSITIVE_FIELD_NAMES, while leaving "input" intact for every other
+    field.
+
+    Args:
+        request: the request that failed validation.
+        exc: the validation error raised by FastAPI/Pydantic.
+
+    Returns:
+        A 422 JSON response with the same overall shape FastAPI normally
+        returns, except sensitive fields never carry an "input" key.
+    """
+    sanitized_errors = []
+    for error in exc.errors():
+        loc = error.get("loc", ())
+        field_name = loc[-1] if loc else None
+        sanitized_error = {k: v for k, v in error.items() if k != "input"}
+        if field_name not in SENSITIVE_FIELD_NAMES:
+            if "input" in error:
+                sanitized_error["input"] = error["input"]
+        sanitized_errors.append(sanitized_error)
+
+    content = jsonable_encoder({"detail": sanitized_errors})
+    response = JSONResponse(status_code=422, content=content)
     for header_name, header_value in SECURITY_HEADERS.items():
         response.headers[header_name] = header_value
     return response
