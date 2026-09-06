@@ -1,0 +1,398 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Infer AI: API Reference</title>
+<link rel="stylesheet" href="./css/base.css">
+<style>
+  html { scroll-behavior: smooth; }
+
+  .topnav {
+    position: sticky;
+    top: 0;
+    z-index: 10;
+    height: 64px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0 24px;
+    background: var(--color-canvas);
+    border-bottom: 1px solid var(--color-hairline);
+  }
+
+  .topnav-brand {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .topnav-mark {
+    width: 24px;
+    height: 24px;
+    border-radius: var(--rounded-full);
+    background: var(--color-primary);
+    flex-shrink: 0;
+  }
+
+  .topnav-name {
+    font-weight: 600;
+    font-size: 16px;
+    letter-spacing: -0.04em;
+  }
+
+  .topnav-links {
+    display: flex;
+    align-items: center;
+    gap: 24px;
+  }
+
+  .topnav-links a {
+    font-size: 14px;
+    font-weight: 500;
+    color: var(--color-body);
+  }
+
+  .page-section {
+    padding: 0 24px;
+    max-width: 1200px;
+    margin: 0 auto;
+    box-sizing: border-box;
+  }
+
+  .hero {
+    padding: 96px 24px 64px;
+  }
+
+  .hero-inner {
+    max-width: 680px;
+  }
+
+  .hero h1 {
+    font-family: var(--font-display);
+    font-weight: 600;
+    letter-spacing: -0.04em;
+    line-height: 1.1;
+    font-size: clamp(32px, 5vw, 56px);
+    margin: 0 0 20px;
+    color: var(--color-ink);
+  }
+
+  .hero p {
+    font-size: 16px;
+    line-height: 1.5;
+    color: var(--color-body);
+    margin: 0 0 32px;
+  }
+
+  .endpoint-grid-section {
+    padding: 0 24px 96px;
+  }
+
+  .endpoint-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+    gap: 24px;
+  }
+
+  .endpoint-card {
+    display: block;
+    color: inherit;
+  }
+
+  .endpoint-card:hover {
+    color: inherit;
+  }
+
+  .endpoint-card .badge-pill {
+    margin-bottom: 14px;
+  }
+
+  .endpoint-card-path {
+    font-family: var(--font-mono);
+    font-size: 14px;
+    color: var(--color-ink);
+    margin-bottom: 8px;
+  }
+
+  .endpoint-card-desc {
+    font-size: 14px;
+    line-height: 1.5;
+    color: var(--color-body);
+  }
+
+  .reference-section {
+    padding: 64px 24px 96px;
+  }
+
+  .reference-section h2 {
+    font-family: var(--font-display);
+    font-weight: 600;
+    letter-spacing: -0.03em;
+    font-size: 32px;
+    margin: 0 0 12px;
+    color: var(--color-ink);
+  }
+
+  .reference-intro {
+    font-size: 16px;
+    line-height: 1.5;
+    color: var(--color-body);
+    margin: 0 0 32px;
+    max-width: 680px;
+  }
+
+  .reference-nav {
+    margin-bottom: 48px;
+  }
+
+  .endpoint-detail-list {
+    display: flex;
+    flex-direction: column;
+    gap: 24px;
+  }
+
+  .endpoint-detail-header {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    flex-wrap: wrap;
+    margin-bottom: 12px;
+  }
+
+  .endpoint-detail-path {
+    font-family: var(--font-mono);
+    font-size: 18px;
+    color: var(--color-ink);
+  }
+
+  .endpoint-detail-desc {
+    font-size: 14px;
+    line-height: 1.5;
+    color: var(--color-body);
+    margin: 0 0 24px;
+  }
+
+  .endpoint-detail-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+    gap: 16px;
+  }
+
+  .endpoint-field-label {
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--color-ink);
+    margin-bottom: 8px;
+  }
+
+  .endpoint-code-block {
+    background: var(--color-surface-card);
+    border-radius: var(--rounded-md);
+    padding: 16px;
+    font-family: var(--font-mono);
+    font-size: 13px;
+    line-height: 1.6;
+    color: var(--color-ink);
+    margin: 0;
+    overflow-x: auto;
+  }
+
+  .endpoint-code-block.narrow {
+    max-width: 400px;
+  }
+
+  .endpoint-detail-errors {
+    margin-top: 20px;
+    font-size: 13px;
+    color: var(--color-muted);
+    line-height: 1.6;
+  }
+
+  .site-footer {
+    background: var(--color-surface-dark);
+    color: var(--color-on-dark-soft);
+    padding: 32px 24px;
+  }
+
+  .site-footer-inner {
+    max-width: 1200px;
+    margin: 0 auto;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 12px;
+    box-sizing: border-box;
+  }
+
+  .site-footer-name {
+    font-size: 14px;
+    color: var(--color-on-dark);
+  }
+
+  .site-footer-stack {
+    font-size: 13px;
+    font-family: var(--font-mono);
+  }
+</style>
+</head>
+<body>
+
+<div class="topnav">
+  <div class="topnav-brand">
+    <div class="topnav-mark"></div>
+    <span class="topnav-name">Infer AI</span>
+  </div>
+  <div class="topnav-links">
+    <a href="#top">Overview</a>
+    <a href="#reference">API reference</a>
+  </div>
+</div>
+
+<div id="top" class="page-section hero">
+  <div class="hero-inner">
+    <h1>AI question-answering API</h1>
+    <p>A FastAPI service that authenticates requests with JWT, sends questions to an LLM, and returns the generated answer. Redis handles rate limiting, PostgreSQL handles persistence.</p>
+    <a href="#reference" class="btn-primary">View API reference</a>
+  </div>
+</div>
+
+<div class="page-section endpoint-grid-section">
+  <div class="endpoint-grid">
+    <a href="#endpoint-login" class="card endpoint-card">
+      <span class="badge-pill method-post mono">POST</span>
+      <div class="endpoint-card-path">/auth/login</div>
+      <div class="endpoint-card-desc">Exchanges a username and password for a JWT access token.</div>
+    </a>
+    <a href="#endpoint-chat" class="card endpoint-card">
+      <span class="badge-pill method-post mono">POST</span>
+      <div class="endpoint-card-path">/chat</div>
+      <div class="endpoint-card-desc">Sends a question to the LLM and returns the answer, with latency and token usage recorded.</div>
+    </a>
+    <a href="#endpoint-health" class="card endpoint-card">
+      <span class="badge-pill method-get mono">GET</span>
+      <div class="endpoint-card-path">/health</div>
+      <div class="endpoint-card-desc">Reports Redis and database connectivity for load balancer health checks.</div>
+    </a>
+    <a href="#endpoint-metrics" class="card endpoint-card">
+      <span class="badge-pill method-get mono">GET</span>
+      <div class="endpoint-card-path">/metrics</div>
+      <div class="endpoint-card-desc">Exposes request latency, token usage, and error rate. Restricted to the admin role.</div>
+    </a>
+  </div>
+</div>
+
+<div id="reference" class="page-section reference-section">
+  <h2>API reference</h2>
+  <p class="reference-intro">Four endpoints. All except <span class="mono">/health</span> require a bearer token issued by <span class="mono">/auth/login</span>.</p>
+
+  <div class="nav-pill-group reference-nav">
+    <a href="#endpoint-login" class="nav-pill">Login</a>
+    <a href="#endpoint-chat" class="nav-pill">Chat</a>
+    <a href="#endpoint-health" class="nav-pill">Health</a>
+    <a href="#endpoint-metrics" class="nav-pill">Metrics</a>
+  </div>
+
+  <div class="endpoint-detail-list">
+
+    <div id="endpoint-login" class="card-outline">
+      <div class="endpoint-detail-header">
+        <span class="badge-pill method-post mono">POST</span>
+        <span class="endpoint-detail-path">/auth/login</span>
+        <span class="badge-pill">No auth required</span>
+      </div>
+      <p class="endpoint-detail-desc">Authenticates a user and issues a JWT access token.</p>
+      <div class="endpoint-detail-grid">
+        <div>
+          <div class="endpoint-field-label">Request body</div>
+          <pre class="endpoint-code-block">{
+  "username": "string",
+  "password": "string"
+}</pre>
+        </div>
+        <div>
+          <div class="endpoint-field-label">Response 200</div>
+          <pre class="endpoint-code-block">{
+  "access_token": "eyJhbGciOiJIUzI1NiJ9...",
+  "token_type": "bearer"
+}</pre>
+        </div>
+      </div>
+      <div class="endpoint-detail-errors">401: invalid username or password.</div>
+    </div>
+
+    <div id="endpoint-chat" class="card-outline">
+      <div class="endpoint-detail-header">
+        <span class="badge-pill method-post mono">POST</span>
+        <span class="endpoint-detail-path">/chat</span>
+        <span class="badge-pill">Bearer token required</span>
+      </div>
+      <p class="endpoint-detail-desc">Sends a question to the configured LLM and returns the generated answer. Retries once on timeout, then falls back to a secondary model.</p>
+      <div class="endpoint-detail-grid">
+        <div>
+          <div class="endpoint-field-label">Request body</div>
+          <pre class="endpoint-code-block">{
+  "question": "string"
+}</pre>
+        </div>
+        <div>
+          <div class="endpoint-field-label">Response 200</div>
+          <pre class="endpoint-code-block">{
+  "answer": "string",
+  "latency_ms": 612,
+  "tokens_used": 184,
+  "model": "gpt-4o-mini"
+}</pre>
+        </div>
+      </div>
+      <div class="endpoint-detail-errors">401: missing or invalid token.<br />429: rate limit exceeded.<br />502: LLM provider error after retry.</div>
+    </div>
+
+    <div id="endpoint-health" class="card-outline">
+      <div class="endpoint-detail-header">
+        <span class="badge-pill method-get mono">GET</span>
+        <span class="endpoint-detail-path">/health</span>
+        <span class="badge-pill">No auth required</span>
+      </div>
+      <p class="endpoint-detail-desc">Checks Redis and database connectivity for load balancer and orchestrator health probes.</p>
+      <div>
+        <div class="endpoint-field-label">Response 200</div>
+        <pre class="endpoint-code-block narrow">{
+  "status": "ok",
+  "checks": {
+    "database": "ok",
+    "redis": "ok"
+  }
+}</pre>
+      </div>
+    </div>
+
+    <div id="endpoint-metrics" class="card-outline">
+      <div class="endpoint-detail-header">
+        <span class="badge-pill method-get mono">GET</span>
+        <span class="endpoint-detail-path">/metrics</span>
+        <span class="badge-pill">Admin role required</span>
+      </div>
+      <p class="endpoint-detail-desc">Returns request latency, LLM token usage, and error rate in Prometheus exposition format.</p>
+      <div>
+        <div class="endpoint-field-label">Response 200 (text/plain)</div>
+        <pre class="endpoint-code-block">http_request_duration_seconds{route="/chat"} 0.61
+llm_tokens_used_total 184213
+chat_requests_total{status="200"} 8420
+chat_requests_total{status="502"} 12</pre>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<div class="site-footer">
+  <div class="site-footer-inner">
+    <span class="site-footer-name">Infer AI: AI question-answering API</span>
+    <span class="site-footer-stack mono">FastAPI · Redis · PostgreSQL · Docker</span>
+  </div>
+</div>
+
+</body>
+</html>
