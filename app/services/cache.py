@@ -1,3 +1,4 @@
+import hashlib
 import time
 
 import redis
@@ -23,3 +24,63 @@ def is_rate_limited(client: redis.Redis, key: str, limit_per_minute: int) -> boo
     if count == 1:
         client.expire(redis_key, 60)
     return count > limit_per_minute
+
+
+def _normalize_question(question: str) -> str:
+    """
+    Normalizes a question for cache key purposes: trims whitespace
+    and lowercases it, so "What is FastAPI?" and "  what IS
+    fastapi?  " share a cache entry.
+
+    Args:
+        question: the raw question text.
+
+    Returns:
+        The normalized question text.
+    """
+    return question.strip().lower()
+
+
+def _cache_key(question: str) -> str:
+    """
+    Builds a Redis key for a question's cached answer, hashing the
+    normalized question so the key has a fixed length regardless of
+    question length.
+
+    Args:
+        question: the raw question text.
+
+    Returns:
+        A Redis key string.
+    """
+    normalized = _normalize_question(question)
+    digest = hashlib.sha256(normalized.encode("utf-8")).hexdigest()
+    return f"chatcache:{digest}"
+
+
+def get_cached_answer(client: redis.Redis, question: str) -> str | None:
+    """
+    Looks up a cached answer for the given question.
+
+    Args:
+        client: the Redis client.
+        question: the raw question text.
+
+    Returns:
+        The cached answer string if present, otherwise None.
+    """
+    return client.get(_cache_key(question))
+
+
+def set_cached_answer(client: redis.Redis, question: str, answer: str, ttl_seconds: int) -> None:
+    """
+    Stores an answer for the given question, expiring after
+    ttl_seconds.
+
+    Args:
+        client: the Redis client.
+        question: the raw question text.
+        answer: the answer text to cache.
+        ttl_seconds: how many seconds until the cache entry expires.
+    """
+    client.setex(_cache_key(question), ttl_seconds, answer)
