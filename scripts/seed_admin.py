@@ -14,6 +14,8 @@ Usage:
 import os
 import sys
 
+from sqlalchemy.exc import IntegrityError
+
 from app.core.security import hash_password
 from app.db.session import SessionLocal
 from app.models.user import Role, User
@@ -24,6 +26,20 @@ def seed_admin() -> None:
     Reads ADMIN_USERNAME and ADMIN_PASSWORD from the environment and
     creates an admin user with those credentials, if no user with
     that username already exists.
+
+    The existence check below is a fast path for the common,
+    non-concurrent case only. It is not what actually prevents
+    duplicate admins: two concurrent invocations of this script (for
+    example from a CI/CD retry or a Kubernetes Job restart) can both
+    pass the existence check before either commits. The database's
+    unique constraint on username is the real race-safe guard, so the
+    db.add/db.commit below is wrapped in a try/except for
+    IntegrityError, matching the same pattern already used in
+    app/api/routes/admin.py's create_user route. This keeps the
+    script's observable behavior identical in the normal case (same
+    message, same exit code) while also closing the race in the
+    concurrent case, instead of crashing with an unhandled
+    IntegrityError or silently creating a second admin account.
 
     Exits with a non zero status and prints an error if the required
     environment variables are missing, if the username already
@@ -53,7 +69,12 @@ def seed_admin() -> None:
             role=Role.admin,
         )
         db.add(admin_user)
-        db.commit()
+        try:
+            db.commit()
+        except IntegrityError:
+            db.rollback()
+            print(f"User {username} already exists", file=sys.stderr)
+            sys.exit(1)
         print(f"Created admin user: {username}")
     finally:
         db.close()
