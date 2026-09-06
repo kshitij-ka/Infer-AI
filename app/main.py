@@ -21,34 +21,42 @@ from app.api.deps import get_redis
 from app.api.routes import admin, auth, chat
 from app.core.body_limit import add_body_size_limit_middleware
 from app.core.config import get_settings
+from app.core.logging import add_request_id_middleware, configure_logging
 from app.core.middleware import SECURITY_HEADERS, add_security_headers_middleware
 from app.db.session import get_db
 from app.services.metrics import render_metrics
 
 settings = get_settings()
-logging.basicConfig(level=settings.log_level)
+configure_logging(settings.log_level)
 
 app = FastAPI(title=settings.app_name)
 
 # Starlette runs middleware in the reverse of the order it is added here:
 # the last middleware added is the outermost layer and therefore the first
 # to see an incoming request and the last to see the outgoing response.
-# With the registration order below (body size limit, then security
-# headers, then CORS), the actual per-request execution order is:
+# With the registration order below (request id, then body size limit,
+# then security headers, then CORS), the actual per-request execution
+# order is:
 #   1. CORSMiddleware (outermost, added last): handles preflight
 #      OPTIONS requests and stamps CORS response headers.
 #   2. SecurityHeadersMiddleware: stamps the fixed security headers
 #      onto whatever response the inner layers produce.
-#   3. BodySizeLimitMiddleware (innermost, added first): counts
-#      request body bytes and rejects oversized bodies before they
-#      reach routing or request body parsing.
+#   3. BodySizeLimitMiddleware: counts request body bytes and rejects
+#      oversized bodies before they reach routing or request body
+#      parsing.
+#   4. RequestIdMiddleware (innermost, added first): assigns the
+#      request id and logs the request summary line, so every other
+#      layer, plus the exception handlers, run with the request id
+#      already set in request_id_var.
 # On the way out, responses pass back through this stack in the
-# opposite order (body size limit's own early responses first, then
-# security headers, then CORS). Reordering these add_middleware calls
-# changes which layer sees a request or response first, so do not
-# reorder them without re-checking this comment and the tests in
-# tests/test_body_limit.py, tests/test_security_headers.py, and
-# tests/test_cors.py.
+# opposite order (request id's header attachment first, then body
+# size limit, then security headers, then CORS). Reordering these
+# add_middleware calls changes which layer sees a request or response
+# first, so do not reorder them without re-checking this comment and
+# the tests in tests/test_body_limit.py, tests/test_security_headers.py,
+# tests/test_cors.py, and tests/test_request_id.py.
+add_request_id_middleware(app)
+
 add_body_size_limit_middleware(app, max_bytes=settings.max_request_body_bytes)
 
 add_security_headers_middleware(app)
