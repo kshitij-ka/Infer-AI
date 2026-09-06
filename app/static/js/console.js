@@ -33,17 +33,58 @@
     tab: "chat", // "chat" | "system"
     username: "",
     token: null,
+    role: null,
     loginError: null,
     loginPending: false,
     chatMessages: [GREETING_MESSAGE],
     chatInput: "",
     chatSending: false,
     chatWarning: null, // inline warning banner text (e.g. 429 rate limit)
+    health: null, // last successful /health response, or null before first load
+    healthError: null,
   };
+
+  // Interval handle for the System tab's health polling. Lives outside
+  // `state` since it's not render-relevant, just needs to be reachable
+  // from the tab-switch handler and sign-out to avoid leaking a timer
+  // that keeps firing after the tab/view is gone.
+  var healthPollHandle = null;
 
   function setState(patch) {
     Object.assign(state, patch);
     render();
+  }
+
+  /**
+   * Defensively decodes the payload segment of a JWT (header.payload.signature)
+   * without verifying its signature. The browser already trusts this token,
+   * it just received it from a same-origin /auth/login response over the
+   * connection it controls, so this is purely for reading the embedded
+   * `role` claim client-side; there is no /me endpoint.
+   *
+   * @param {string} token
+   * @returns {Object|null} the decoded payload object, or null if the
+   *   token is malformed/unparseable (degrade gracefully, never throw).
+   */
+  function decodeJwtPayload(token) {
+    if (!token || typeof token !== "string") return null;
+    var parts = token.split(".");
+    if (parts.length !== 3) return null;
+    try {
+      var base64 = parts[1].replace(/-/g, "+").replace(/_/g, "/");
+      var padded = base64 + "===".slice((base64.length + 3) % 4);
+      var json = decodeURIComponent(
+        atob(padded)
+          .split("")
+          .map(function (c) {
+            return "%" + ("00" + c.charCodeAt(0).toString(16)).slice(-2);
+          })
+          .join("")
+      );
+      return JSON.parse(json);
+    } catch (e) {
+      return null;
+    }
   }
 
   function getInitials(username) {
@@ -163,11 +204,13 @@
       var result = await window.Api.login(username, password);
       sessionStorage.setItem(SESSION_TOKEN_KEY, result.access_token);
       sessionStorage.setItem(SESSION_USERNAME_KEY, username);
+      var payload = decodeJwtPayload(result.access_token);
       setState({
         view: "app",
         tab: "chat",
         username: username,
         token: result.access_token,
+        role: payload && payload.role ? payload.role : null,
         loginPending: false,
         loginError: null,
       });
@@ -187,6 +230,7 @@
       type: "button",
       text: "Chat",
       onClick: function () {
+        stopHealthPolling();
         setState({ tab: "chat" });
       },
     });
@@ -196,6 +240,7 @@
       text: "System",
       onClick: function () {
         setState({ tab: "system" });
+        startHealthPolling();
       },
     });
 
@@ -228,9 +273,7 @@
     if (state.tab === "chat") {
       return renderChatTab();
     }
-    return h("div", { class: "tab-body-stub", id: "system-tab-root" }, [
-      h("p", { text: "System tab (coming in a later task)." }),
-    ]);
+    return renderSystemTab();
   }
 
   // ---- Chat tab ----------------------------------------------------------
@@ -380,6 +423,121 @@
     }
   }
 
+  // ---- System tab ----------------------------------------------------
+
+  var HEALTH_POLL_INTERVAL_MS = 10000;
+
+  function fetchHealth() {
+    window.Api.health().then(
+      function (result) {
+        // Guard against a stale response landing after the user has
+        // navigated away from the System tab (interval already cleared,
+        // but a slow in-flight request could still resolve).
+        if (state.tab !== "system") return;
+        setState({ health: result, healthError: null });
+      },
+      function (err) {
+        if (state.tab !== "system") return;
+        setState({ health: null, healthError: err.message || "Unable to reach /health" });
+      }
+    );
+  }
+
+  function startHealthPolling() {
+    stopHealthPolling();
+    fetchHealth();
+    healthPollHandle = setInterval(fetchHealth, HEALTH_POLL_INTERVAL_MS);
+  }
+
+  function stopHealthPolling() {
+    if (healthPollHandle !== null) {
+      clearInterval(healthPollHandle);
+      healthPollHandle = null;
+    }
+  }
+
+  function renderStatusDot(ok) {
+    return h("span", { class: "status-dot " + (ok ? "status-dot-ok" : "status-dot-error") });
+  }
+
+  function renderHealthCard() {
+    if (!state.health && !state.healthError) {
+      return h("div", { class: "card system-card" }, [
+        h("div", { class: "system-card-title", text: "Health" }),
+        h("div", { class: "system-checking", text: "Checking…" }),
+      ]);
+    }
+
+    if (state.healthError) {
+      return h("div", { class: "card system-card" }, [
+        h("div", { class: "system-card-title", text: "Health" }),
+        h("div", { class: "system-row" }, [
+          renderStatusDot(false),
+          h("span", { text: "Unable to reach /health" }),
+        ]),
+        h("div", { class: "mono small system-error-detail", text: state.healthError }),
+      ]);
+    }
+
+    var overallOk = state.health.status === "ok";
+    var checks = state.health.checks || {};
+
+    return h("div", { class: "card system-card" }, [
+      h("div", { class: "system-card-header" }, [
+        h("div", { class: "system-card-title", text: "Health" }),
+        h("span", { class: "badge-pill " + (overallOk ? "status-success" : "warning"), text: state.health.status }),
+      ]),
+      h("div", { class: "system-row" }, [
+        renderStatusDot(overallOk),
+        h("span", { text: "Overall status" }),
+      ]),
+      h("div", { class: "system-row" }, [
+        renderStatusDot(checks.database === "ok"),
+        h("span", { text: "Database" }),
+        h("span", { class: "mono small system-row-value", text: checks.database || "unknown" }),
+      ]),
+      h("div", { class: "system-row" }, [
+        renderStatusDot(checks.redis === "ok"),
+        h("span", { text: "Redis" }),
+        h("span", { class: "mono small system-row-value", text: checks.redis || "unknown" }),
+      ]),
+    ]);
+  }
+
+  function handleViewRawMetrics() {
+    window.Api.metricsText(state.token).then(
+      function (text) {
+        var blob = new Blob([text], { type: "text/plain" });
+        var url = URL.createObjectURL(blob);
+        window.open(url, "_blank");
+      },
+      function (err) {
+        window.alert(err.message || "Unable to load /metrics");
+      }
+    );
+  }
+
+  function renderMetricsCard() {
+    if (state.role !== "admin") return null;
+
+    return h("div", { class: "card system-card" }, [
+      h("div", { class: "system-card-title", text: "Metrics" }),
+      h("p", { class: "small system-metrics-caption", text: "Prometheus exposition format, admin only." }),
+      h("button", {
+        class: "btn-secondary",
+        type: "button",
+        text: "View raw metrics",
+        onClick: handleViewRawMetrics,
+      }),
+    ]);
+  }
+
+  function renderSystemTab() {
+    return h("div", { class: "system-tab-root", id: "system-tab-root" }, [
+      h("div", { class: "system-tab-inner" }, [renderHealthCard(), renderMetricsCard()]),
+    ]);
+  }
+
   function renderAppShell() {
     return h("div", { class: "app-shell" }, [
       renderTopNav(),
@@ -389,6 +547,7 @@
   }
 
   function handleSignOut() {
+    stopHealthPolling();
     sessionStorage.removeItem(SESSION_TOKEN_KEY);
     sessionStorage.removeItem(SESSION_USERNAME_KEY);
     setState({
@@ -396,12 +555,15 @@
       tab: "chat",
       username: "",
       token: null,
+      role: null,
       loginError: null,
       loginPending: false,
       chatMessages: [GREETING_MESSAGE],
       chatInput: "",
       chatSending: false,
       chatWarning: null,
+      health: null,
+      healthError: null,
     });
   }
 
@@ -420,6 +582,8 @@
       state.view = "app";
       state.token = storedToken;
       state.username = storedUsername;
+      var payload = decodeJwtPayload(storedToken);
+      state.role = payload && payload.role ? payload.role : null;
     }
     render();
   }
