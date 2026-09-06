@@ -11,7 +11,7 @@ from app.api.deps import get_redis
 from app.api.routes import auth, chat
 from app.core.body_limit import add_body_size_limit_middleware
 from app.core.config import get_settings
-from app.core.middleware import add_security_headers_middleware
+from app.core.middleware import SECURITY_HEADERS, add_security_headers_middleware
 from app.db.session import get_db
 from app.services.metrics import render_metrics
 
@@ -56,10 +56,15 @@ async def handle_unexpected_exception(request: Request, exc: Exception) -> JSONR
         exc: the exception that was raised.
 
     Returns:
-        A 500 JSON response with a fixed, generic detail message.
+        A 500 JSON response with a fixed, generic detail message and
+        the same baseline security headers every other response
+        carries.
     """
     logger.exception("Unhandled exception on %s %s", request.method, request.url.path)
-    return JSONResponse(status_code=500, content={"detail": "Internal server error"})
+    response = JSONResponse(status_code=500, content={"detail": "Internal server error"})
+    for header_name, header_value in SECURITY_HEADERS.items():
+        response.headers[header_name] = header_value
+    return response
 
 
 @app.get("/health")
