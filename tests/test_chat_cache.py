@@ -1,3 +1,4 @@
+from app.core.config import get_settings
 from app.models.user import Role
 
 
@@ -62,3 +63,71 @@ def test_cached_answer_still_logs_chat_history(client, seed_user, fake_llm, test
     assert len(cache_hit_logs) == 1
     assert cache_hit_logs[0].prompt_tokens == 0
     assert cache_hit_logs[0].completion_tokens == 0
+
+
+def test_fallback_answer_is_never_cached(client, seed_user, fake_llm):
+    """
+    A fallback answer, returned when the LLM client itself is
+    unavailable, is never written to the cache, so a temporary outage
+    does not get remembered as the permanent answer for that question
+    once the LLM recovers.
+    """
+    from app.services.llm_client import LLMResult
+
+    seed_user(username="alice", password="password123", role=Role.user)
+    token = _login(client, "alice", "password123")
+
+    fake_llm.ask.return_value = LLMResult(
+        answer="The AI service is temporarily unavailable. Please try again in a moment.",
+        prompt_tokens=0,
+        completion_tokens=0,
+        is_fallback=True,
+    )
+    first_response = client.post(
+        "/chat",
+        json={"question": "will this be cached"},
+        headers={"Authorization": f"Bearer {token}"},
+    )
+
+    fake_llm.ask.return_value = LLMResult(
+        answer="a real answer once the LLM recovered",
+        prompt_tokens=3,
+        completion_tokens=4,
+        is_fallback=False,
+    )
+    second_response = client.post(
+        "/chat",
+        json={"question": "will this be cached"},
+        headers={"Authorization": f"Bearer {token}"},
+    )
+
+    assert first_response.status_code == 200
+    assert second_response.status_code == 200
+    assert "temporarily unavailable" in first_response.json()["answer"]
+    assert second_response.json()["answer"] == "a real answer once the LLM recovered"
+    assert fake_llm.ask.call_count == 2
+
+
+def test_rate_limit_still_applies_with_warm_cache(client, seed_user, fake_llm):
+    """
+    Repeated requests for the same question that are served from
+    cache still count against the requesting user's rate limit, so a
+    warm cache cannot be used to bypass the rate limiter by asking a
+    single question in a tight loop.
+    """
+    seed_user(username="alice", password="password123", role=Role.user)
+    token = _login(client, "alice", "password123")
+    limit = get_settings().rate_limit_per_minute
+
+    statuses = []
+    for _ in range(limit + 5):
+        response = client.post(
+            "/chat",
+            json={"question": "am i rate limited yet"},
+            headers={"Authorization": f"Bearer {token}"},
+        )
+        statuses.append(response.status_code)
+
+    assert fake_llm.ask.call_count == 1
+    assert statuses.count(429) > 0
+    assert statuses[-1] == 429
