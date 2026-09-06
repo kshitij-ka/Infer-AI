@@ -24,7 +24,7 @@ SECURITY_HEADERS = {
     "Content-Security-Policy": (
         "default-src 'none'; "
         "script-src 'self'; "
-        "style-src 'self' https://fonts.googleapis.com; "
+        "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; "
         "font-src https://fonts.gstatic.com; "
         "img-src 'self'; "
         "connect-src 'self'; "
@@ -41,7 +41,13 @@ class SecurityHeadersMiddleware(BaseHTTPMiddleware):
     then allows only the specific sources the static frontend
     (app/static/) actually needs: same-origin scripts, styles, images,
     and fetch() calls, plus the Google Fonts CDN that tokens.css
-    imports. Every other directive stays at 'none'.
+    imports. style-src also allows 'unsafe-inline' because both static
+    pages define their page-specific layout in a plain <style> block
+    rather than a second external stylesheet; this is safe here since
+    neither page ever writes user- or LLM-controlled text into a
+    <style> tag or a style="" attribute (chat answers and usernames
+    are inserted via textContent, which style-src has no bearing on
+    either way). Every other directive stays at 'none'.
     """
 
     async def dispatch(self, request: Request, call_next: RequestResponseEndpoint) -> Response:
