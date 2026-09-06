@@ -44,10 +44,25 @@ class LLMClient:
         self._client = Groq(api_key=settings.groq_api_key, timeout=self._timeout)
 
     def ask(self, question: str) -> LLMResult:
+        """Ask the LLM a question, falling back to a canned answer on failure.
+
+        Retries transient Groq SDK errors internally. If retries are
+        exhausted, this catches the exception and returns a fallback
+        result instead of raising, so callers never need their own
+        try/except for LLM failures. Only a fixed, safe set of fields
+        (exception class name and, when present, HTTP status code) is
+        logged, never the exception's free form string representation,
+        since that text originates from Groq's own API response body
+        and is not on an allowlist of safe-to-log content.
+        """
         try:
             return self._ask_with_retry(question)
         except _RETRYABLE_EXCEPTIONS as exc:
-            logger.error("LLM call failed after retries: %s", exc)
+            logger.error(
+                "LLM call failed after retries: %s (status_code=%s)",
+                exc.__class__.__name__,
+                getattr(exc, "status_code", None),
+            )
             return LLMResult(answer=FALLBACK_ANSWER, prompt_tokens=0, completion_tokens=0, is_fallback=True)
 
     def _ask_with_retry(self, question: str) -> LLMResult:
