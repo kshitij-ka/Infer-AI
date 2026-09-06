@@ -2,8 +2,7 @@
 
 ## 1. System diagram (as implemented + target production shape)
 
-![[Architecture Diagram.png|700]]
-
+![Architecture Diagram](Architecture%20Diagram.png)
 
 `/metrics` exposes Prometheus counters/histograms (latency, token usage, request outcome) scraped by a Prometheus server; `/health` checks DB and Redis connectivity so the load balancer / orchestrator can evict unhealthy instances.
 
