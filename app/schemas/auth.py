@@ -2,14 +2,14 @@
 Request and response models for the login route.
 """
 
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 
 class LoginRequest(BaseModel):
     """The submitted username and password."""
 
-    username: str
-    password: str
+    username: str = Field(max_length=64)
+    password: str = Field(max_length=128)
 
 
 class LoginResponse(BaseModel):
