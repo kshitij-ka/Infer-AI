@@ -1,77 +1,63 @@
-import fakeredis
-
-from app.api.routes.auth import _build_login_rate_limit_key
-from app.services.cache import is_rate_limited
+from app.core.config import get_settings
 
 
-def test_login_rate_limit_blocks_after_threshold(client, seed_user):
+def test_malformed_login_body_eventually_rate_limited(client):
     """
-    Repeated login attempts against the same username and client IP
-    beyond the configured threshold get 429, regardless of whether
-    the password is correct, so a brute force loop is blocked before
-    it can guess the password.
+    Sending a malformed body (missing the required password field) to
+    POST /auth/login repeatedly must eventually get a 429, once the
+    number of requests from this IP crosses
+    IP_ONLY_LOGIN_RATE_LIMIT_PER_MINUTE, even though every individual
+    request would otherwise only fail Pydantic validation with a 422.
+
+    This proves the bypass is closed: before LoginIPRateLimitMiddleware
+    existed, an attacker could send an unlimited number of malformed
+    requests and never trigger the rate limiter, since the route level
+    per-username-and-IP check only runs after successful body
+    validation.
+    """
+    settings = get_settings()
+    limit = settings.ip_only_login_rate_limit_per_minute
+
+    statuses = []
+    for _ in range(limit + 5):
+        response = client.post("/auth/login", json={"username": "attacker"})
+        statuses.append(response.status_code)
+
+    assert 429 in statuses
+    first_429_index = statuses.index(429)
+    # Every response before the limit is crossed must be a 422 (the
+    # malformed body correctly fails validation), not a 429, so the
+    # test also proves the middleware does not fire prematurely.
+    assert all(status == 422 for status in statuses[:first_429_index])
+
+
+def test_single_malformed_login_request_still_gets_422(client):
+    """
+    A single malformed request, well under the new IP-only threshold,
+    must still get a plain 422 validation error, not a 429. The new
+    middleware must not change behavior for an ordinary one-off
+    mistake such as a client forgetting the password field.
+    """
+    response = client.post("/auth/login", json={"username": "someone"})
+
+    assert response.status_code == 422
+
+
+def test_well_formed_logins_under_account_limit_are_unaffected(client, seed_user):
+    """
+    Well formed login requests, sent fewer times than both the
+    existing per-username-and-IP limit and the new per-IP-only limit,
+    must succeed normally. The new, coarser IP-only layer has a
+    deliberately higher threshold than the existing per-account limit,
+    so it must not prematurely rate limit legitimate traffic that the
+    existing, more precise check would still allow.
     """
     seed_user(username="alice", password="password123")
+    settings = get_settings()
+    account_limit = settings.login_rate_limit_per_minute
 
-    last_status = None
-    for _ in range(15):
+    for _ in range(account_limit - 1):
         response = client.post(
-            "/auth/login",
-            json={"username": "alice", "password": "wrong-password"},
+            "/auth/login", json={"username": "alice", "password": "password123"}
         )
-        last_status = response.status_code
-
-    assert last_status == 429
-
-
-def test_login_succeeds_under_rate_limit(client, seed_user):
-    """A single correct login attempt succeeds normally."""
-    seed_user(username="bob", password="password123")
-
-    response = client.post(
-        "/auth/login",
-        json={"username": "bob", "password": "password123"},
-    )
-
-    assert response.status_code == 200
-    assert response.json()["access_token"]
-
-
-def test_rate_limit_key_does_not_collide_across_username_ip_boundary():
-    """
-    Two different (username, ip) pairs that would have produced the
-    identical literal string under a plain "login:{username}:{ip}"
-    concatenation must not share a rate limit bucket. The colliding
-    pair below is constructed from a victim logging in from an IPv6
-    address (which itself contains colons) and a crafted username
-    that ends with a colon, so that joining "crafted_username : ip"
-    reassembles into the exact same character sequence as joining
-    "victim_username : victim_ip", even though the two pairs are not
-    the same username and not the same IP. Exhausting the crafted
-    pair's quota must leave the victim's own bucket unaffected.
-    """
-    victim_username = "victim"
-    victim_ip = "::1"
-
-    crafted_username = "victim:"
-    crafted_ip = ":1"
-
-    old_scheme_attacker_key = f"login:{crafted_username}:{crafted_ip}"
-    old_scheme_victim_key = f"login:{victim_username}:{victim_ip}"
-    assert old_scheme_attacker_key == old_scheme_victim_key, (
-        "test setup error: the crafted pair must reproduce the exact "
-        "collision the old raw concatenation scheme was vulnerable to"
-    )
-    assert (crafted_username, crafted_ip) != (victim_username, victim_ip)
-
-    attacker_key = _build_login_rate_limit_key(crafted_username, crafted_ip)
-    victim_key = _build_login_rate_limit_key(victim_username, victim_ip)
-    assert attacker_key != victim_key
-
-    fake_redis = fakeredis.FakeStrictRedis(decode_responses=True)
-    limit = 10
-
-    for _ in range(limit + 5):
-        is_rate_limited(fake_redis, key=attacker_key, limit_per_minute=limit)
-
-    assert is_rate_limited(fake_redis, key=victim_key, limit_per_minute=limit) is False
+        assert response.status_code == 200

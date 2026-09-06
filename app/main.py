@@ -14,6 +14,7 @@ from app.api.routes import admin, auth, chat
 from app.core.body_limit import add_body_size_limit_middleware
 from app.core.config import get_settings
 from app.core.logging import add_request_id_middleware, configure_logging
+from app.core.login_rate_limit import add_login_ip_rate_limit_middleware
 from app.core.middleware import SECURITY_HEADERS, add_security_headers_middleware
 from app.db.session import get_db
 from app.services.metrics import render_metrics
@@ -34,9 +35,9 @@ app = FastAPI(title=settings.app_name)
 # Starlette runs middleware in the reverse of the order it is added here:
 # the last middleware added is the outermost layer and therefore the first
 # to see an incoming request and the last to see the outgoing response.
-# With the registration order below (request id, then body size limit,
-# then security headers, then CORS), the actual per-request execution
-# order is:
+# With the registration order below (request id, then login IP rate
+# limit, then body size limit, then security headers, then CORS), the
+# actual per-request execution order is:
 #   1. CORSMiddleware (outermost, added last): handles preflight
 #      OPTIONS requests and stamps CORS response headers.
 #   2. SecurityHeadersMiddleware: stamps the fixed security headers
@@ -44,18 +45,35 @@ app = FastAPI(title=settings.app_name)
 #   3. BodySizeLimitMiddleware: counts request body bytes and rejects
 #      oversized bodies before they reach routing or request body
 #      parsing.
-#   4. RequestIdMiddleware (innermost, added first): assigns the
+#   4. LoginIPRateLimitMiddleware: for POST /auth/login only, checks a
+#      per-client-IP rate limit before any request body parsing or
+#      Pydantic validation happens, so a malformed body (one that
+#      would otherwise fail LoginRequest validation with a 422 before
+#      the route function body, and therefore before its own
+#      per-username-and-IP rate limit check, ever runs) still counts
+#      against a rate limit. This must sit inside (run after)
+#      BodySizeLimitMiddleware, since an oversized body should still
+#      get its own 413 rather than consuming a login rate limit slot,
+#      and outside (run before) RequestIdMiddleware is not required
+#      but keeps ordering simple, since this layer does not need the
+#      request id.
+#   5. RequestIdMiddleware (innermost, added first): assigns the
 #      request id and logs the request summary line, so every other
 #      layer, plus the exception handlers, run with the request id
 #      already set in request_id_var.
 # On the way out, responses pass back through this stack in the
-# opposite order (request id's header attachment first, then body
-# size limit, then security headers, then CORS). Reordering these
-# add_middleware calls changes which layer sees a request or response
-# first, so do not reorder them without re-checking this comment and
-# the tests in tests/test_body_limit.py, tests/test_security_headers.py,
-# tests/test_cors.py, and tests/test_request_id.py.
+# opposite order (request id's header attachment first, then login IP
+# rate limit, then body size limit, then security headers, then CORS).
+# Reordering these add_middleware calls changes which layer sees a
+# request or response first, so do not reorder them without
+# re-checking this comment and the tests in tests/test_body_limit.py,
+# tests/test_security_headers.py, tests/test_cors.py,
+# tests/test_request_id.py, and tests/test_login_rate_limit.py.
 add_request_id_middleware(app)
+
+add_login_ip_rate_limit_middleware(
+    app, limit_per_minute=settings.ip_only_login_rate_limit_per_minute
+)
 
 add_body_size_limit_middleware(app, max_bytes=settings.max_request_body_bytes)
 

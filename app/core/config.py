@@ -44,6 +44,7 @@ class Settings(BaseSettings):
 
     rate_limit_per_minute: int = 60
     login_rate_limit_per_minute: int = 10
+    ip_only_login_rate_limit_per_minute: int = 30
     cache_ttl_seconds: int = 300
     cors_allowed_origins: str = ""
     max_request_body_bytes: int = 65536

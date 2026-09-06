@@ -47,8 +47,9 @@ def fake_llm():
 
 
 @pytest.fixture
-def client(fake_llm):
+def client(fake_llm, monkeypatch):
     from app.main import app
+    from app.services import cache as cache_module
 
     Base.metadata.create_all(bind=TEST_ENGINE)
     fake_redis = fakeredis.FakeStrictRedis(decode_responses=True)
@@ -56,6 +57,17 @@ def client(fake_llm):
     app.dependency_overrides[get_db] = _override_get_db
     app.dependency_overrides[get_redis] = lambda: fake_redis
     app.dependency_overrides[get_llm_client] = lambda: fake_llm
+
+    # LoginIPRateLimitMiddleware runs outside FastAPI's dependency
+    # injection system (middleware cannot use Depends), so it reads
+    # the Redis client through the get_redis_client() module level
+    # singleton getter in app/services/cache.py rather than through
+    # the get_redis dependency overridden above. Patching that
+    # singleton directly to the same fake_redis instance keeps every
+    # rate limit check in a single test hitting one shared fake
+    # Redis, matching how the real app shares one Redis connection
+    # across the middleware and route layers.
+    monkeypatch.setattr(cache_module, "_redis_client", fake_redis)
 
     with TestClient(app, raise_server_exceptions=False) as test_client:
         yield test_client
