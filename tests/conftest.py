@@ -1,6 +1,6 @@
 import os
 
-os.environ.setdefault("JWT_SECRET_KEY", "test-secret")
+os.environ.setdefault("JWT_SECRET_KEY", "test-secret-with-minimum-length-required")
 os.environ.setdefault("DATABASE_URL", "sqlite:///./test.db")
 os.environ.setdefault("REDIS_URL", "redis://localhost:6379/0")
 os.environ.setdefault("GROQ_API_KEY", "test-key")
