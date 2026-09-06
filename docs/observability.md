@@ -8,6 +8,8 @@ This covers the three related pieces that let an operator see what this applicat
 
 Every request gets a UUID, assigned by `RequestIdMiddleware`, held in a context variable for the duration of that request, included in every log line emitted while handling it, and returned to the client as the `X-Request-ID` response header. A user reporting an issue can hand back that header value, and an operator can grep logs for that exact id to see everything that happened while handling that one request, without needing to correlate by timestamp alone.
 
+The per request summary line (`app/core/logging.py`) includes `request.url.path`. This is safe today because no route in this application has path parameters or accepts credentials via query string, every route takes its data through a JSON request body, so the path is always one of a small fixed set of literal strings. This is a "true today" fact about the current route table, not a structural guarantee enforced by the logging code itself. Any future route that adds a path parameter (for example `/users/{user_id}` carrying a token, or a query string carrying sensitive data) would need to account for this before that route ships, either by keeping sensitive values out of the path and query string entirely or by sanitizing `request.url.path` before it reaches this log line. 
+
 ## Metrics
 
 `GET /metrics` exposes Prometheus text format metrics, defined in `app/services/metrics.py`:
