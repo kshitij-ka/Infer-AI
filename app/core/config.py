@@ -26,7 +26,7 @@ class Settings(BaseSettings):
 
     model_config = SettingsConfigDict(env_file=".env", extra="ignore")
 
-    app_name: str = "ai-qa-api"
+    app_name: str = "Infer AI"
     environment: str = "development"
     log_level: str = "INFO"
 

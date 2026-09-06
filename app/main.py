@@ -4,10 +4,11 @@ from fastapi import Depends, FastAPI, Response
 from fastapi.encoders import jsonable_encoder
 from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
 from sqlalchemy import text
 from sqlalchemy.orm import Session
 from starlette.requests import Request
-from starlette.responses import JSONResponse
+from starlette.responses import FileResponse, JSONResponse
 
 from app.api.deps import get_redis, require_role
 from app.api.routes import admin, auth, chat
@@ -206,3 +207,35 @@ def metrics(_admin: User = Depends(require_role(Role.admin))) -> Response:
     """
     body, content_type = render_metrics()
     return Response(content=body, media_type=content_type)
+
+
+@app.get("/console")
+def console() -> FileResponse:
+    """
+    Serves the console HTML page at a clean, extension-less path.
+
+    StaticFiles with html=True (mounted below) would only serve this
+    file for a request to "/console.html", not "/console". This
+    explicit route, registered before the static mount, handles the
+    extension-less path the frontend is designed to be reached at.
+
+    Returns:
+        The console.html file from app/static/.
+    """
+    return FileResponse("app/static/console.html")
+
+
+# Mounted last, after every API router and inline route above, so none
+# of them can ever be shadowed by the static file server. FastAPI/
+# Starlette match routes in registration order, and a mount only
+# handles a request once every route registered before it has already
+# failed to match. html=True makes this StaticFiles instance serve
+# app/static/index.html for a request to "/" and for any other
+# not-found path under the mount, and serves app/static/css/* and
+# app/static/js/* at their natural relative paths (e.g. "/css/base.css",
+# "/js/api.js"), which is what index.html's and console.html's
+# relative <link>/<script> tags expect. The path is relative to the
+# working directory uvicorn is started from, "/app" per the Dockerfile
+# WORKDIR, so "app/static" is correct both in the container and when
+# run locally from the repo root.
+app.mount("/", StaticFiles(directory="app/static", html=True), name="static")
