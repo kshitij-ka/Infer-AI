@@ -11,3 +11,18 @@ def test_oversized_request_body_is_rejected(client):
     )
 
     assert response.status_code == 413
+
+
+def test_malformed_content_length_is_rejected(client):
+    """
+    A request with a non-numeric Content-Length header must be rejected
+    with 400 before parsing, rather than crashing the middleware.
+    """
+    response = client.post(
+        "/chat",
+        content='{"question":"test"}',
+        headers={"Content-Type": "application/json", "Content-Length": "not-a-number"},
+    )
+
+    assert response.status_code == 400
+    assert response.json() == {"detail": "Invalid Content-Length header"}

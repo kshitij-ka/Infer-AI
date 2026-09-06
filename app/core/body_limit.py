@@ -39,15 +39,24 @@ class BodySizeLimitMiddleware(BaseHTTPMiddleware):
             call_next: the next handler in the middleware chain.
 
         Returns:
-            A 413 JSON response if the body is too large, otherwise
-            the response from call_next.
+            A 413 JSON response if the body is too large, a 400 JSON
+            response if the Content-Length header is malformed, or
+            otherwise the response from call_next.
         """
         content_length = request.headers.get("content-length")
-        if content_length is not None and int(content_length) > self.max_bytes:
-            return JSONResponse(
-                status_code=413,
-                content={"detail": "Request body too large"},
-            )
+        if content_length is not None:
+            try:
+                content_length_int = int(content_length)
+            except ValueError:
+                return JSONResponse(
+                    status_code=400,
+                    content={"detail": "Invalid Content-Length header"},
+                )
+            if content_length_int > self.max_bytes:
+                return JSONResponse(
+                    status_code=413,
+                    content={"detail": "Request body too large"},
+                )
         return await call_next(request)
 
 
