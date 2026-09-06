@@ -90,3 +90,50 @@ def test_settings_accepts_non_wildcard_cors_origins(monkeypatch):
 
     settings = Settings()
     assert settings.cors_allowed_origins == "https://app.example.com,https://admin.example.com"
+
+
+def test_settings_rejects_max_request_body_bytes_below_floor(monkeypatch):
+    """
+    A max_request_body_bytes value below the 1024 byte floor must be
+    rejected at settings construction time, since zero or a negative
+    value would be silently accepted otherwise and a tiny value would
+    reject essentially all legitimate JSON payloads.
+    """
+    monkeypatch.setenv("JWT_SECRET_KEY", "a" * 32)
+    monkeypatch.setenv("DATABASE_URL", "sqlite:///./test.db")
+    monkeypatch.setenv("REDIS_URL", "redis://localhost:6379/0")
+    monkeypatch.setenv("GROQ_API_KEY", "test-key")
+    monkeypatch.setenv("MAX_REQUEST_BODY_BYTES", "0")
+
+    from app.core.config import Settings
+
+    with pytest.raises(ValidationError):
+        Settings()
+
+
+def test_settings_rejects_negative_max_request_body_bytes(monkeypatch):
+    """A negative max_request_body_bytes value must be rejected."""
+    monkeypatch.setenv("JWT_SECRET_KEY", "a" * 32)
+    monkeypatch.setenv("DATABASE_URL", "sqlite:///./test.db")
+    monkeypatch.setenv("REDIS_URL", "redis://localhost:6379/0")
+    monkeypatch.setenv("GROQ_API_KEY", "test-key")
+    monkeypatch.setenv("MAX_REQUEST_BODY_BYTES", "-1")
+
+    from app.core.config import Settings
+
+    with pytest.raises(ValidationError):
+        Settings()
+
+
+def test_settings_accepts_max_request_body_bytes_at_floor(monkeypatch):
+    """A max_request_body_bytes value exactly at the 1024 byte floor is accepted."""
+    monkeypatch.setenv("JWT_SECRET_KEY", "a" * 32)
+    monkeypatch.setenv("DATABASE_URL", "sqlite:///./test.db")
+    monkeypatch.setenv("REDIS_URL", "redis://localhost:6379/0")
+    monkeypatch.setenv("GROQ_API_KEY", "test-key")
+    monkeypatch.setenv("MAX_REQUEST_BODY_BYTES", "1024")
+
+    from app.core.config import Settings
+
+    settings = Settings()
+    assert settings.max_request_body_bytes == 1024

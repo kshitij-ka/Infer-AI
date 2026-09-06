@@ -12,6 +12,7 @@ from pydantic import field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 MIN_JWT_SECRET_LENGTH = 32
+MIN_MAX_REQUEST_BODY_BYTES = 1024
 
 
 class Settings(BaseSettings):
@@ -93,6 +94,30 @@ class Settings(BaseSettings):
                 "cors_allowed_origins must not contain a literal '*' entry, "
                 "since allow_credentials=True combined with a wildcard "
                 "origin allows any site to make credentialed requests"
+            )
+        return value
+
+    @field_validator("max_request_body_bytes")
+    @classmethod
+    def max_request_body_bytes_must_have_a_sane_floor(cls, value: int) -> int:
+        """
+        Rejects a max_request_body_bytes value below
+        MIN_MAX_REQUEST_BODY_BYTES. A zero or negative value would be
+        silently accepted otherwise, and a value smaller than a bare
+        empty JSON object would reject essentially all legitimate
+        payloads.
+
+        Args:
+            value: the raw max_request_body_bytes value read from the
+                environment.
+
+        Returns:
+            The same value, unchanged, once it passes the floor check.
+        """
+        if value < MIN_MAX_REQUEST_BODY_BYTES:
+            raise ValueError(
+                f"max_request_body_bytes must be at least "
+                f"{MIN_MAX_REQUEST_BODY_BYTES} bytes"
             )
         return value
 
