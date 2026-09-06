@@ -20,6 +20,20 @@ def test_non_admin_cannot_create_user(client, seed_user):
     assert response.status_code == 403
 
 
+def test_readonly_cannot_create_user(client, seed_user):
+    """A readonly user gets 403 when attempting to create a user."""
+    seed_user(username="bob", password="password123", role=Role.readonly)
+    token = _login(client, "bob", "password123")
+
+    response = client.post(
+        "/admin/users",
+        json={"username": "newuser", "password": "password123", "role": "user"},
+        headers={"Authorization": f"Bearer {token}"},
+    )
+
+    assert response.status_code == 403
+
+
 def test_admin_can_create_user(client, seed_user):
     """An admin can create a new user with a chosen role."""
     seed_user(username="admin", password="adminpass123", role=Role.admin)
