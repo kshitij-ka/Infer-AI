@@ -1,3 +1,6 @@
+"""
+Groq LLM client with retry, timeout, and fallback handling.
+"""
 import logging
 from dataclasses import dataclass
 
@@ -20,6 +23,11 @@ _RETRYABLE_EXCEPTIONS = (APIConnectionError, APITimeoutError, APIStatusError)
 
 @dataclass
 class LLMResult:
+    """
+    The outcome of an LLM call: the answer text, token counts, and
+    whether this is the fallback answer.
+    """
+
     answer: str
     prompt_tokens: int
     completion_tokens: int
@@ -27,14 +35,16 @@ class LLMResult:
 
 
 class LLMClient:
-    """Thin wrapper around the Groq (OpenAI-compatible) chat completion API.
-
-    Retries transient failures with exponential backoff, bounds each call
-    with a timeout, and returns a canned fallback answer if all attempts
-    are exhausted so callers never have to handle a raised LLM error.
+    """
+    Thin wrapper around the Groq chat completion API. Retries
+    transient failures with exponential backoff, bounds each call
+    with a timeout, and returns a canned fallback answer if all
+    attempts are exhausted, so callers never have to handle a raised
+    LLM error themselves.
     """
 
     def __init__(self) -> None:
+        """Builds the underlying Groq client from application settings."""
         settings = get_settings()
         self._model = settings.groq_model
         self._timeout = settings.llm_timeout_seconds
@@ -42,16 +52,16 @@ class LLMClient:
         self._client = Groq(api_key=settings.groq_api_key, timeout=self._timeout)
 
     def ask(self, question: str) -> LLMResult:
-        """Ask the LLM a question, falling back to a canned answer on failure.
+        """
+        Sends a question to the LLM and returns the answer, or the
+        fallback answer if every retry attempt fails.
 
-        Retries transient Groq SDK errors internally. If retries are
-        exhausted, this catches the exception and returns a fallback
-        result instead of raising, so callers never need their own
-        try/except for LLM failures. Only a fixed, safe set of fields
-        (exception class name and, when present, HTTP status code) is
-        logged, never the exception's free form string representation,
-        since that text originates from Groq's own API response body
-        and is not on an allowlist of safe-to-log content.
+        Args:
+            question: the question text to send.
+
+        Returns:
+            An LLMResult with the answer and token usage, or the
+            fallback answer with is_fallback set to True.
         """
         try:
             return self._ask_with_retry(question)
@@ -66,6 +76,7 @@ class LLMClient:
             )
 
     def _ask_with_retry(self, question: str) -> LLMResult:
+        """Calls the Groq API with exponential backoff retry on transient errors."""
         @retry(
             reraise=True,
             stop=stop_after_attempt(self._max_retries),
@@ -92,6 +103,13 @@ _llm_client: LLMClient | None = None
 
 
 def get_llm_client() -> LLMClient:
+    """
+    FastAPI dependency that returns a process wide LLMClient
+    instance, creating it on first use.
+
+    Returns:
+        The shared LLMClient instance.
+    """
     global _llm_client
     if _llm_client is None:
         _llm_client = LLMClient()

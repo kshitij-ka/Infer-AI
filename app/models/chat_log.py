@@ -1,3 +1,6 @@
+"""
+Chat log model, recording every chat request and its outcome.
+"""
 import uuid
 from datetime import UTC, datetime
 
@@ -8,6 +11,13 @@ from app.db.base import Base
 
 
 class ChatLog(Base):
+    """
+    One row per chat request, whether it was answered by the LLM,
+    served from cache, or answered with the fallback message. Used
+    both as an audit trail and as the source data behind the
+    Prometheus metrics this application exposes.
+    """
+
     __tablename__ = "chat_logs"
 
     id: Mapped[str] = mapped_column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))

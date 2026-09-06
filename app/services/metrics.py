@@ -1,3 +1,7 @@
+"""
+Prometheus metrics definitions and helpers for the chat route and
+the metrics endpoint.
+"""
 from prometheus_client import CONTENT_TYPE_LATEST, Counter, Histogram, generate_latest
 
 REQUEST_LATENCY = Histogram(
@@ -19,6 +23,17 @@ CHAT_REQUESTS = Counter(
 def record_chat_metrics(
     latency_ms: float, prompt_tokens: int, completion_tokens: int, status: str
 ) -> None:
+    """
+    Records one chat request's outcome into the module level
+    Prometheus collectors.
+
+    Args:
+        latency_ms: how long the request took, in milliseconds.
+        prompt_tokens: prompt tokens used, zero on a cache hit.
+        completion_tokens: completion tokens used, zero on a cache
+            hit.
+        status: one of "ok", "fallback", or "cache_hit".
+    """
     REQUEST_LATENCY.observe(latency_ms)
     TOKEN_USAGE.labels(type="prompt").inc(prompt_tokens)
     TOKEN_USAGE.labels(type="completion").inc(completion_tokens)
@@ -26,4 +41,12 @@ def record_chat_metrics(
 
 
 def render_metrics() -> tuple[bytes, str]:
+    """
+    Renders every registered Prometheus collector in text exposition
+    format.
+
+    Returns:
+        A tuple of the encoded metrics body and its content type
+        string.
+    """
     return generate_latest(), CONTENT_TYPE_LATEST
