@@ -14,6 +14,7 @@
   --color-surface-card: #f5f5f5;
   --color-surface-strong: #e5e7eb;
   --color-surface-dark: #101010;
+  /* Dark elevated surface pairs with dark footer treatment for nested cards */
   --color-surface-dark-elevated: #1a1a1a;
 
   /* Colors - Hairline */
@@ -32,12 +33,11 @@
   /* Colors - Semantic */
   --color-success: #10b981;
   --color-warning: #f59e0b;
+  /* Error color is used by Task 4 (login failure, chat error states) per the plan's gap-filling */
   --color-error: #ef4444;
 
   /* Colors - Badge Pastels */
   --color-badge-orange: #fb923c;
-  --color-badge-pink: #ec4899;
-  --color-badge-violet: #8b5cf6;
   --color-badge-emerald: #34d399;
 
   /* Method badge colors (used in API docs mockup) */
@@ -56,7 +56,6 @@
 
   /* Border Radius */
   --rounded-xs: 4px;
-  --rounded-sm: 6px;
   --rounded-md: 8px;
   --rounded-lg: 12px;
   --rounded-xl: 16px;
