@@ -69,6 +69,33 @@ class Settings(BaseSettings):
             )
         return value
 
+    @field_validator("cors_allowed_origins")
+    @classmethod
+    def cors_allowed_origins_must_not_contain_wildcard(cls, value: str) -> str:
+        """
+        Rejects a literal "*" entry in cors_allowed_origins. The app
+        registers CORSMiddleware with allow_credentials=True, and
+        Starlette treats an origin list containing "*" as reflect any
+        origin, which combined with allow_credentials=True would let
+        any external site make credentialed cross origin requests and
+        read responses.
+
+        Args:
+            value: the raw cors_allowed_origins value read from the
+                environment, a comma separated list of origins.
+
+        Returns:
+            The same value, unchanged, once it passes the check.
+        """
+        entries = [entry.strip() for entry in value.split(",")]
+        if "*" in entries:
+            raise ValueError(
+                "cors_allowed_origins must not contain a literal '*' entry, "
+                "since allow_credentials=True combined with a wildcard "
+                "origin allows any site to make credentialed requests"
+            )
+        return value
+
 
 @lru_cache
 def get_settings() -> Settings:
