@@ -55,7 +55,7 @@ def client(fake_llm):
     app.dependency_overrides[get_redis] = lambda: fake_redis
     app.dependency_overrides[get_llm_client] = lambda: fake_llm
 
-    with TestClient(app) as test_client:
+    with TestClient(app, raise_server_exceptions=False) as test_client:
         yield test_client
 
     app.dependency_overrides.clear()

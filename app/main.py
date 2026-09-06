@@ -4,6 +4,8 @@ from fastapi import Depends, FastAPI, Response
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy import text
 from sqlalchemy.orm import Session
+from starlette.requests import Request
+from starlette.responses import JSONResponse
 
 from app.api.deps import get_redis
 from app.api.routes import auth, chat
@@ -37,6 +39,27 @@ app.add_middleware(
 
 app.include_router(auth.router)
 app.include_router(chat.router)
+
+logger = logging.getLogger(__name__)
+
+
+@app.exception_handler(Exception)
+async def handle_unexpected_exception(request: Request, exc: Exception) -> JSONResponse:
+    """
+    Catches any exception not handled by a more specific handler,
+    logs the full detail server side, and returns a body containing
+    no exception message or type, so internal detail never reaches
+    the client.
+
+    Args:
+        request: the request that triggered the exception.
+        exc: the exception that was raised.
+
+    Returns:
+        A 500 JSON response with a fixed, generic detail message.
+    """
+    logger.exception("Unhandled exception on %s %s", request.method, request.url.path)
+    return JSONResponse(status_code=500, content={"detail": "Internal server error"})
 
 
 @app.get("/health")
