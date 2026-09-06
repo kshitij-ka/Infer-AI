@@ -12,6 +12,7 @@ RUN pip install --no-cache-dir -r requirements.txt
 RUN useradd --create-home --shell /bin/bash appuser
 
 COPY --chown=appuser:appuser app ./app
+COPY --chown=appuser:appuser scripts ./scripts
 COPY --chown=appuser:appuser alembic ./alembic
 COPY --chown=appuser:appuser alembic.ini .
 
