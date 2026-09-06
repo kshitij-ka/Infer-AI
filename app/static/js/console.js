@@ -262,13 +262,6 @@
     ]);
   }
 
-  function renderAuthCaption() {
-    return h("div", {
-      class: "mono small app-auth-caption",
-      text: "Authorization: Bearer eyJhbGciOiJIUzI1NiJ9…redacted",
-    });
-  }
-
   function renderTabBody() {
     if (state.tab === "chat") {
       return renderChatTab();
@@ -539,11 +532,7 @@
   }
 
   function renderAppShell() {
-    return h("div", { class: "app-shell" }, [
-      renderTopNav(),
-      renderAuthCaption(),
-      renderTabBody(),
-    ]);
+    return h("div", { class: "app-shell" }, [renderTopNav(), renderTabBody()]);
   }
 
   function handleSignOut() {
