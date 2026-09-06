@@ -7,6 +7,7 @@ from sqlalchemy.orm import Session
 
 from app.api.deps import get_redis
 from app.api.routes import auth, chat
+from app.core.body_limit import add_body_size_limit_middleware
 from app.core.config import get_settings
 from app.core.middleware import add_security_headers_middleware
 from app.db.session import get_db
@@ -16,6 +17,8 @@ settings = get_settings()
 logging.basicConfig(level=settings.log_level)
 
 app = FastAPI(title=settings.app_name)
+
+add_body_size_limit_middleware(app, max_bytes=settings.max_request_body_bytes)
 
 add_security_headers_middleware(app)
 
